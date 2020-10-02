@@ -1,0 +1,72 @@
+---
+- name: installation of docker
+  block: 
+  - name: "APT - install misc packages"
+    apt:
+      name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+      update_cache: yes
+
+  - name: "APT - Add Docker GPG key"
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - name: Verify that we have the key with the fingerprint
+    apt_key:
+      id: 0EBFCD88
+      state: present
+
+  - name: "APT - Add Docker repository"
+    apt_repository:
+      repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+      state: present
+      filename: docker
+
+  - name: "APT - install 'docker-ce'"
+    apt:
+      name: "docker-ce"
+      update_cache: yes
+
+  - name: Create "docker" group
+    group:
+      name: "docker"
+      state: present
+
+  - name: Add remote "ubuntu" user to "docker" group
+    user:
+      name: "{{ remote_user }}"
+      group: "{{ docker_group }}"
+      append: yes
+
+  - name: Install docker-compose
+    get_url:
+      url: https://github.com/docker/compose/releases/download/1.20.1/docker-compose-Linux-x86_64
+      dest: /usr/local/bin/docker-compose
+      mode: 0755
+
+# get latest using github api
+# 
+
+
+# ---
+# - uri:
+#     url: https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/releases/latest
+#     return_content: yes
+#   register: releases
+
+# - get_url:
+#     url: https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/releases/assets/{{ id }}
+#     headers:
+#       Accept: application/octet-stream
+#     dest: "{{ asset_path }}"
+#     mode: "{{ asset_mode }}"
+#     force: yes
+#   vars:
+#     release_data: "{{ releases.json|to_json }}"
+#     arch: "{{ ansible_system|lower }}-{{ arch_map[ansible_userspace_architecture] }}"
+#     id: "{{ release_data|from_json|json_query('assets[?ends_with(@.name, `' ~ arch ~ '`)] | [0].id') }}"

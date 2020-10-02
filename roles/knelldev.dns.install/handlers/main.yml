@@ -1,0 +1,20 @@
+---
+- name: restart unbound
+  systemd: 
+    name: unbound 
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+
+- name: restart pihole
+  systemd: 
+    name: "{{ item }}" 
+    state: restarted
+    enabled: yes
+    # daemon_reload: yes
+  loop:
+    - lighttpd
+    # - dnsmasq
+    - pihole-FTL
+  become: yes

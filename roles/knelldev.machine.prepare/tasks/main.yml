@@ -1,0 +1,10 @@
+---
+- name: machine prepare block
+  block:
+  - include_tasks: apt.yml
+  - include_tasks: pip.yml
+  - include_tasks: configure.yml  
+  - include_tasks: deploy_motd.yml
+
+  become: true
+  tags: dns

@@ -1,0 +1,14 @@
+---
+- name: Ensure group exists
+  group:
+    name: "{{ dns_os_group }}"
+    state: present
+
+- name: Add user exists
+  user:
+    name: "{{ dns_os_user }}"
+    groups: "{{ dns_os_group }}"
+    shell: /sbin/nologin
+    append: yes
+    comment: "dns application user"
+    state: present

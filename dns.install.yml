@@ -1,0 +1,5 @@
+---
+- name: Ansible Playbook for configuring Pi-Hole and unbound
+  hosts: dns2.knell.dev
+  roles:
+    - knelldev.dns.install

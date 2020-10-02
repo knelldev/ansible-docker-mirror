@@ -1,0 +1,10 @@
+# {{ ansible_managed }} 
+server:
+
+{% for item in dns_unboud_local_zone.values() %}
+local-zone: "{{ item.url }} redirect"
+{% endfor %}
+
+{% for item in dns_unboud_local.values() %}
+local-data: "{{ item.url }} A {{ item.ip }}"
+{% endfor %}
