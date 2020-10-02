@@ -164,3 +164,9 @@ This Document collects Ideas and Todos
 * Backup plan
 * Next Steps Network/NAS
 * Wetterstation und Blitzradar betreiben und daten verfügbar machen
+
+
+## New ideas 02/10
+* gitlab runner
+* prepare überarbeiten
+
