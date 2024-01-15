@@ -1,0 +1,39 @@
+---
+dns_os_user: dns
+dns_os_group: dns
+
+dns_ipv4: 10.0.0.2
+
+dns_root_hints_url: https://www.internic.net/domain/named.root
+dns_unboud_local:
+  dns.knell.dev:
+    ip: 10.0.1.2
+    url: dns.knell.dev  
+  tower.knell.dev:
+    ip: 10.0.0.5
+    url: tower.knell.dev
+  pve.knell.dev:
+    ip: 10.0.0.4
+    url: pve.knell.dev
+  opnsense.knell.dev:
+    ip: 10.0.0.1
+    url: opnsense.knell.dev
+  gitlab.knell.dev:
+    ip: 10.0.0.10
+    url: gitlab.knell.dev
+  i.knell.dev:
+    ip: 10.0.0.15
+    url: "i.knell.dev"
+
+dns_unboud_local_zone:
+  i.knell.dev:
+    url: "i.knell.dev"
+
+
+dns_pihole_path: "/opt/pihole"
+dns_pihole_src: "/etc/.pihole"
+dns_pihole_config: "/etc/pihole"
+dns_pihole_network_interface: ens18
+dns_pihole_dns: 127.0.0.1#5353
+
+dns_pihole_password: admin

@@ -1,0 +1,38 @@
+---
+- name: Add aliases to .bashrc
+  blockinfile:
+    path: "~/.bashrc"
+    block: "{{ machine_aliases }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for aliases"
+  when: prepare_root_user
+
+- name: Add aliases to .bashrc
+  blockinfile:
+    path: "/home/{{ item }}/.bashrc"
+    block: "{{ machine_aliases }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for aliases"
+  loop: "{{ prepare_users }}"
+
+- name: Add path to environment
+  blockinfile:
+    path: /etc/environment
+    block: "PATH=\"{{ machine_path }}\""
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for path"
+
+- name: adding users to group sudo
+  user:
+    name: '{{ item }}'
+    groups: sudo
+    append: yes
+  loop: "{{ prepare_sudo_users }}"
+
+- name: change hostname to myserver
+  hostname:
+    name: "{{ machine_hostname }}"
+
+- name: add myself to /etc/hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '^127\.0\.0\.1[ \t]+localhost'
+    line: '127.0.0.1 localhost {{ machine_hostname }}'
+    state: present

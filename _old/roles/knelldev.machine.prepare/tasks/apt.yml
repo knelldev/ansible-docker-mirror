@@ -1,0 +1,6 @@
+---
+- name: install basic packages
+  apt:
+    name: "{{ machine_apt_list }}"
+    state: latest
+    update_cache: yes

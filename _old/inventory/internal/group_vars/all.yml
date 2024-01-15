@@ -1,0 +1,11 @@
+---
+ansible_python_interpreter: /usr/bin/python3
+prepare_users:
+  - knell
+
+# Add existing users to sudo group
+prepare_sudo_users:
+  - knell
+
+# modify .bashrc for root user
+prepare_root_user: True

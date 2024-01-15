@@ -1,0 +1,9 @@
+---
+- name: dns install block
+  block:
+  - include_tasks: prepare.yml
+  - include_tasks: unbound.install.yml
+  - include_tasks: pihole.install.yml
+
+  become: true
+  tags: dns

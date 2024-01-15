@@ -1,0 +1,6 @@
+---
+- name: Prepares Machines
+  hosts: gitlab.knell.dev
+  roles:
+    - knelldev.machine.prepare
+  become: yes

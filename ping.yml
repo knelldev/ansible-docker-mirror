@@ -1,0 +1,6 @@
+---
+- name: "Playbook: ping"
+  hosts: all
+  tasks:
+    - name: Ping host for tests
+      action: ansible.builtin.ping

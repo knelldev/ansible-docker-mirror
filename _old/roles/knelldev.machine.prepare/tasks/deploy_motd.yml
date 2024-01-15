@@ -1,0 +1,59 @@
+---
+# https://github.com/ldidry/dynamic-motd - http://mewbies.com/how_to_customize_your_console_login_message_tutorial.htm#motduname - https://systembash.com/adding-random-quotes-to-the-bash-login-screen/ - https://outsideit.net/firemotd/ - https://www.linux.com/tutorials/put-talking-cow-your-linux-message-day/ - https://indibit.de/raspberry-pi-ssh-login-nachricht-anpassen-motd/ - https://www.lifewire.com/linux-command-motd-4092343 - https://dev.to/lucasalt/a-personal-motd-14h8 
+- name: install motd packages
+  apt:
+    name: [figlet, lsb-release, python-utmp, bc]
+    state: latest
+    update_cache: yes
+
+- name: remove old motd folders
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/motd
+    - /etc/update-motd.d
+    - /opt/motd
+
+- name: create motd folder
+  file:
+    path: "/opt/motd"
+    state: directory
+  loop:
+    - /opt/motd
+    - /etc/update-motd.d
+
+- name: clone motd from github
+  git:
+    repo: 'https://github.com/ldidry/dynamic-motd.git'
+    dest: /opt/motd
+
+- name: change permissions in motd
+  file:
+    path: "/opt/motd/update-motd.d/{{item.filename}}"
+    owner: root
+    group: root
+    mode: '{{item.filemode}}'
+    recurse: yes
+  loop:
+    - { filename: "", filemode: "755" }
+
+- name: remove execute permission
+  file:
+    path: "/opt/motd/update-motd.d/{{item.filename}}"
+    owner: root
+    group: root
+    mode: '{{item.filemode}}'
+  loop:
+    - { filename: "colors", filemode: "644" }
+    - { filename: "sysinfo.py", filemode: "644" }
+
+- name: Create two hard links
+  file:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    state: link
+    force: yes
+  loop:
+    - { src: '/opt/motd/update-motd.d', dest: '/etc/update-motd.d' }
+    - { src: '/var/run/motd', dest: '/etc/motd' }

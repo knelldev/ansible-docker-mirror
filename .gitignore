@@ -1,0 +1,14 @@
+# ansible
+*.retry
+
+# vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# logs
+logs/
+
+# development stuff
+_tmp/

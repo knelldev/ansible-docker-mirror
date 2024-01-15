@@ -1,0 +1,6 @@
+---
+- name: install pip packages
+  apt:
+    name: "{{ machine_pip_list }}"
+    state: latest
+    update_cache: yes
