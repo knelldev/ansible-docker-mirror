@@ -1,0 +1,6 @@
+---
+- hosts: all
+  roles:
+    - win_prepare
+    - win_container
+    - win_gitlab_runner

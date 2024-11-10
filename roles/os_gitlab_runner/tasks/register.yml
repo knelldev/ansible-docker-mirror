@@ -1,0 +1,67 @@
+---
+- name: block
+  block:
+  - name: admin token block
+    block:
+    - name: Obtain admin user access token
+      uri:
+        url: "{{ gitlab_url }}/oauth/token"
+        method: POST
+        validate_certs: no
+        status_code: 200
+        body_format: json
+        headers:
+              Content-Type: application/json
+        body: >
+            {
+              "grant_type": "password",
+              "username": "{{ gitlab_admin_user  }}",
+              "password": "{{ gitlab_admin_password }}"
+            }
+      register: gitlab_admin_access_token
+
+    - name: Grab current existing users
+      uri:
+        url: "{{ gitlab_url }}/api/v4/users/"
+        method: GET
+        validate_certs: no
+        status_code: 200
+        body_format: json
+        headers:
+              Content-Type: application/json
+              Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token  }}"
+      register: gitlab_existing_users
+
+    - name: Concatenate a list to string
+      set_fact:
+        gitlab_admin_uid: "{{ gitlab_existing_users.json | json_query(query) }}"
+      vars:
+        query: "[?username=='{{ gitlab_admin_user }}'].id | [0]"
+
+    - name: output id of admin user
+      debug:
+        msg: "Admin user id: {{ gitlab_admin_uid }}"
+    when: runner_item.registration.type == 'project' or runner_item.registration.type == 'group' or runner_item.registration.type == 'shared'
+
+  - include_tasks: register-{{ runner_item.registration.type }}.yml
+
+  # when: runner_item.registration.type == 'project'
+  when: runner_item.runner_name not in runner_list.stdout and runner_item.runner_name not in runner_list.stderr
+
+- name: Ensure proxy for docker-runners
+  lineinfile:
+    path: /etc/gitlab-runner/config.toml
+    regexp: |
+      ^  name = "{{ runner_item.runner_name }}"
+        environment
+    insertafter: >
+      ^  name = "{{ runner_item.runner_name }}"
+    line: '  environment = ["https_proxy={{ https_proxy }}", "http_proxy={{ https_proxy }}", "HTTPS_PROXY={{ https_proxy }}", "HTTP_PROXY={{ http_proxy }}", "NO_PROXY={{ no_proxy }}", "no_proxy={{ no_proxy }}", "RUNNER_NAME={{ runner_item.runner_name }}"]'
+  when: os_proxy.enabled and runner_item.executor == 'docker'
+
+- name: Remove proxy for docker-runners
+  lineinfile:
+    path: /etc/gitlab-runner/config.toml
+    state: absent
+    regexp: '^  environment ='
+  when: not os_proxy.enabled and runner_item.executor == 'docker'

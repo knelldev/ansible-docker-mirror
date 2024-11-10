@@ -1,0 +1,35 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+con_nginx_enabled: true # Disable the deployment of the nginx container. Can be configured independently from certbot.
+con_nginx_systemd_service_state: restarted
+
+con_nginx_container_network_create: true
+con_nginx_container_network_name: nginx_default
+
+con_nginx_authentik_url: https://auth.example.com
+
+con_nginx_ssl_https_foward: true
+
+con_nginx_ssl_certbot_enabled: true
+con_nginx_ssl_certbot_email: admin@example.com
+con_nginx_ssl_cloudflare_token: |
+  # Cloudflare API token used by Certbot
+  dns_cloudflare_api_token = 1234567890
+
+con_nginx_configs:
+  - url: "test.example.com" # Without http/https
+    cert_url: "test.example.com" # can also be wildcard
+    proxy_url: http://localhost:3000/
+    proxy_location: /
+
+    config_template: default.conf.j2
+
+    # Extra configs inside the default location
+    extra_config_location: |
+      # Extra configs
+
+    # Extra configs at the end of the file. Can be anything outside of the default location. (e.g. a new location)
+    extra_config_global: |
+      # Extra configs

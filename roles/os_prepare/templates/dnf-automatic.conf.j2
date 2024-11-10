@@ -1,0 +1,47 @@
+[commands]
+# Set the type of updates to apply. Options are:
+# default - all updates
+# security - security updates only
+# bugfix - bugfix updates only
+# enhancement - enhancement updates only
+# newpackage - install new packages when updates introduce them
+# distro-sync - apply all updates as a distro-sync
+upgrade_type = default
+
+[emitters]
+# Disable all notification methods
+emit_via = motd
+
+# Motd (Message of the Day) configuration
+# Note: 'motd' will show a message on the login screen, no emails will be sent
+motd = yes
+
+[base]
+# Set the debug level (1-10)
+debuglevel = 1
+
+# Log messages to the system log
+# Use 'journal' to log messages to the system journal
+# Use 'syslog' to log messages to syslog
+# 'syslog' requires the syslog service to be running
+log = journal
+
+# Apply updates automatically
+apply_updates = yes
+
+[download]
+# Automatically download updates (without applying)
+download_updates = yes
+
+# Save downloaded updates in a cache (for later manual installation)
+# If set to 'yes', updates will not be removed from cache after installation
+save_before_exit = no
+
+[upgrade]
+# Automatically reboot if required after an update
+# Reboot type can be:
+# - 'when-needed': Reboot only if necessary
+# - 'reboot': Always reboot after applying updates
+# - 'reboot-and-wait': Reboot and wait for all processes to restart
+# - 'no-reboot': Never reboot automatically
+reboot = no-reboot

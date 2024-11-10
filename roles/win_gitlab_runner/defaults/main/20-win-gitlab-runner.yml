@@ -1,0 +1,26 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+win_gitlab_runner_base_path: '{{ win_storage_base_path }}\gitlab-runner'
+
+win_gitlab_runner_version: "" # empty for latest
+win_gitlab_runner_state: latest # present or latest
+
+win_gitlab_runner_user_create: true
+win_gitlab_runner_user: gitlab-runner
+win_gitlab_runner_pw: Pa$$w0rd
+
+win_gitlab_runner_concurrent: 3
+
+# Mount \\.\pipe\docker_engine into the containers for building containers without a shell runner
+win_gitlab_runner_docker_mount_docker_named_pipe: true
+
+win_gitlab_runner_list:
+  - token: token # create on UI
+    executor: docker-windows
+    image: mcr.microsoft.com/windows/servercore:ltsc2022
+    description: win-docker
+  - token: token # create on UI
+    executor: shell
+    description: win-shell

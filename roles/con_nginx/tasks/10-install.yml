@@ -1,0 +1,130 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Template {{ app_name }} files"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: quadlet-nginx.container.j2
+          dest: "/etc/containers/systemd/nginx.container"
+      when: con_nginx_enabled
+
+    - name: "({{ task_filename }}) Copy error page"
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: error.html
+          dest: "{{ app_path }}/html/error.html"
+        - src: http_status_map.conf
+          dest: "{{ app_path }}/conf.d/http_status_map.conf"
+
+    - name: "({{ task_filename }}) Template {{ app_name }} network"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: quadlet-nginx_default.network.j2
+          dest: /etc/containers/systemd/{{ con_nginx_container_network_name }}.network
+      when: con_nginx_enabled and con_nginx_container_network_create
+
+    - name: "({{ task_filename }}) Template Cerbot for all domains "
+      ansible.builtin.template:
+        src: "quadlet-nginx_certbot.container.j2"
+        dest: "/etc/containers/systemd/nginx_certbot-{{ item.cert_url }}.container"
+        mode: "0644"
+      loop: "{{ con_nginx_configs }}"
+      when: con_nginx_ssl_certbot_enabled
+
+    - name: "({{ task_filename }}) Create a symbolic links for container services"
+      ansible.builtin.file:
+        src: "/etc/containers/systemd/{{ item }}"
+        dest: "{{ app_path }}/quadlet-{{ item }}"
+        state: link
+      loop:
+        - "nginx.container"
+        - "{{ con_nginx_container_network_name }}.network"
+      when: con_nginx_enabled
+
+    - name: "({{ task_filename }}) Template Cerbot for all domains"
+      ansible.builtin.file:
+        src: "/etc/containers/systemd/nginx_certbot-{{ item.cert_url }}.container"
+        dest: "{{ app_path }}/quadlet-nginx_certbot-{{ item.cert_url }}.container"
+        state: link
+      loop: "{{ con_nginx_configs }}"
+      when: con_nginx_ssl_certbot_enabled
+
+    - name: "({{ task_filename }}) Create cloudflare.ini"
+      ansible.builtin.copy:
+        dest: "{{ app_path }}/cloudflare.ini"
+        mode: "0600"
+        content: "{{ con_nginx_ssl_cloudflare_token }}"
+      when: con_nginx_ssl_certbot_enabled
+
+    - name: "({{ task_filename }}) Template {{ app_name }} files"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: default_https_forward.conf.j2
+          dest: "{{ app_path }}/conf.d/default_https_forward.conf"
+      when: con_nginx_ssl_https_foward
+
+    - name: "({{ task_filename }}) Template {{ app_name }} files"
+      ansible.builtin.template:
+        src: "default.conf.j2"
+        dest: "{{ app_path }}/conf.d/{{ item.url }}.conf"
+        mode: "0644"
+      loop: "{{ con_nginx_configs }}"
+      when: con_nginx_enabled
+
+    - name: "({{ task_filename }}) start {{ app_name }}-certbot quadlet"
+      ansible.builtin.systemd_service:
+        state: "{{ con_nginx_systemd_service_state }}"
+        daemon_reload: true
+        name: "nginx_certbot-{{ item.cert_url }}"
+      loop: "{{ con_nginx_configs }}"
+      when: con_nginx_ssl_certbot_enabled
+
+    - name: "({{ task_filename }}) Get stats of a file"
+      ansible.builtin.stat:
+        path: "{{ app_path }}/ssl/live/{{ item.cert_url }}/fullchain.pem"
+      register: register_certbot
+      until: register_certbot.stat is defined and (register_certbot.stat.exists)
+      retries: 12
+      delay: 10
+      loop: "{{ con_nginx_configs }}"
+
+    - name: "({{ task_filename }}) create crojob for daily certificate renews"
+      ansible.builtin.cron:
+        name: "Check certbot for due certificate renews."
+        special_time: daily
+        job: "systemctl restart nginx_certbot-{{ item.cert_url }}"
+      loop: "{{ con_nginx_configs }}"
+      when: con_nginx_ssl_certbot_enabled
+
+    - name: "({{ task_filename }}) start {{ app_name }} quadlet"
+      ansible.builtin.systemd_service:
+        state: "{{ con_nginx_systemd_service_state }}"
+        daemon_reload: true
+        name: nginx
+
+    - name: "({{ task_filename }}) Ensure {{ app_name }} is started and accepting connections"
+      ansible.builtin.uri:
+        url: "http://{{ item.url }}"
+        return_content: true
+        status_code: 200, 403
+        follow_redirects: all
+        timeout: 5
+        validate_certs: "{{ http.ssl_verify }}"
+      register: healthcheck
+      until: healthcheck.status is defined and (healthcheck.status == 200 or healthcheck.status == 403)
+      retries: "{{ http.retries }}"
+      delay: "{{ http.delay }}"
+      loop: "{{ con_nginx_configs }}"

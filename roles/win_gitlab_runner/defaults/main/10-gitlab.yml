@@ -1,0 +1,8 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+gitlab_base_domain: example.com
+gitlab_domain: "gitlab.{{ gitlab_base_domain }}"
+
+gitlab_external_url: "http://{{ gitlab_domain }}/"

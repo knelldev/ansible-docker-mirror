@@ -1,0 +1,12 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+storage_base_path: /data # noqa var-naming[no-role-prefix]
+
+http: # noqa var-naming[no-role-prefix]
+  retries: 40
+  delay: 15
+  retries_short: 3
+  delay_short: 5
+  ssl_verify: false

@@ -1,0 +1,18 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+con_gitlab_ssl_certs_write: false
+
+con_gitlab_ssl_certs_dict:
+  - path: "{{ app_path }}/config/ssl/example.com.key"
+    content: |
+      123
+  - path: "{{ app_path }}/config/ssl/example.com.crt"
+    content: |
+      123
+
+# LetsEncrypt configuration.
+con_gitlab_letsencrypt_enable: false
+con_gitlab_letsencrypt_contact_emails: ["gitlab@example.com"]
+con_gitlab_letsencrypt_alt_names: []

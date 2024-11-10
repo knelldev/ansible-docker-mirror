@@ -1,0 +1,77 @@
+#!/bin/bash
+set -e
+
+# This script configures those stuff, which can't be configured via GITLAB_OMNIBUS_CONFIG.
+# The gitlab-rails console can be started on the host via
+# > docker exec -it gitlab gitlab-rails console
+
+gitlab-rails runner - <<EOS
+# - disable signup: https://gitlab.com/gitlab-org/omnibus-gitlab/-/issues/2837
+ApplicationSetting.last.update(signup_enabled: {{ con_gitlab_config_signup_enabled | lower }})
+
+# - disable root group creation
+ApplicationSetting.last.update(can_create_group: {{ con_gitlab_config_can_create_group | lower }})
+ApplicationSetting.last.update(allow_project_creation_for_guest_and_below: {{ con_gitlab_config_allow_project_creation_for_guest_and_below | lower }})
+
+# - disable auto-devops (required by Docker-in-Docker, but I've security concerns)
+ApplicationSetting.last.update(auto_devops_enabled: {{ con_gitlab_config_auto_devops_enabled | lower }})
+
+# - Monday is the first day of week... what else?!
+ApplicationSetting.last.update(first_day_of_week: 1)
+
+# - Admin settings
+# - https://docs.gitlab.com/ee/user/admin_area/settings/sign_in_restrictions.html#admin-mode
+ApplicationSetting.last.update(admin_mode: {{ con_gitlab_config_admin_mode | lower }})
+ApplicationSetting.last.update(require_admin_two_factor_authentication: {{ con_gitlab_require_admin_two_factor_authentication | lower }})
+ApplicationSetting.last.update(two_factor_grace_period: {{ con_gitlab_two_factor_grace_period }})
+
+# - Enable input sources
+ApplicationSetting.last.update(import_sources: {{ con_gitlab_import_sources }})
+ApplicationSetting.last.update(allow_local_requests_from_web_hooks_and_services: true)
+
+# - Disable public repos/profiles
+ApplicationSetting.last.update(restricted_visibility_levels: [20])
+
+# - SSH key hardening
+ApplicationSetting.last.update(rsa_key_restriction: 2048)
+ApplicationSetting.last.update(dsa_key_restriction: -1)
+ApplicationSetting.last.update(ecdsa_key_restriction: 256)
+ApplicationSetting.last.update(ed25519_key_restriction: 256)
+ApplicationSetting.last.update(ecdsa_sk_key_restriction: 256)
+ApplicationSetting.last.update(ed25519_sk_key_restriction: 256)
+
+# - Rate limits/throttles
+ApplicationSetting.last.update(throttle_unauthenticated_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_api_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_web_enabled: true)
+ApplicationSetting.last.update(throttle_protected_paths_enabled: true)
+ApplicationSetting.last.update(throttle_unauthenticated_packages_api_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_packages_api_enabled: true)
+ApplicationSetting.last.update(throttle_unauthenticated_files_api_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_files_api_enabled: true)
+ApplicationSetting.last.update(throttle_unauthenticated_api_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_git_lfs_enabled: true)
+ApplicationSetting.last.update(throttle_unauthenticated_deprecated_api_enabled: true)
+ApplicationSetting.last.update(throttle_authenticated_deprecated_api_enabled: true)
+ApplicationSetting.last.update(throttle_unauthenticated_git_http_enabled: true)
+ApplicationSetting.last.update(rate_limits_unauthenticated_git_http: {"throttle_unauthenticated_git_http_enabled"=>true, "throttle_unauthenticated_git_http_period_in_seconds"=>3600, "throttle_unauthenticated_git_http_requests_per_period"=>3600})
+# ApplicationSetting.last.update(rate_limiting_response_text: "")
+
+# - Usage Statistics
+ApplicationSetting.last.update(usage_ping_enabled: {{ con_gitlab_usage_metrics | lower }})
+ApplicationSetting.last.update(include_optional_metrics_in_service_ping: {{ con_gitlab_usage_metrics | lower }})
+ApplicationSetting.last.update(usage_ping_features_enabled: {{ con_gitlab_usage_metrics | lower }})
+
+# - Other settings
+ApplicationSetting.last.update(password_authentication_enabled_for_git: false)
+ApplicationSetting.last.update(hide_third_party_offers: true)
+ApplicationSetting.last.update(after_sign_out_path: "{{ con_gitlab_after_sign_out_path | lower }}")
+
+
+{{ con_gitlab_config_custom }}
+
+EOS
+
+update-ca-certificates --fresh
+
+echo "Post Reconfigure Script successfully executed"

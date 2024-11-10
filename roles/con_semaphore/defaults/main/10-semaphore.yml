@@ -1,0 +1,21 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+con_semaphore_expose: true
+con_semaphore_port: 3000
+con_semaphore_url: "http://localhost:{{ con_semaphore_port }}"
+
+con_semaphore_container_network_create: true
+con_semaphore_container_network_name: con_semaphore_default
+
+con_semaphore_systemd_service_state: restarted
+
+con_semaphore_db_user: semaphore
+con_semaphore_db_password: someRandom!Password_ForTheDb
+con_semaphore_db_name: semaphore
+
+con_semaphore_admin_user: admin
+con_semaphore_admin_password: admin
+con_semaphore_admin_email: admin@example.com
+con_semaphore_admin_name: Admin

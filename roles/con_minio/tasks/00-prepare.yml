@@ -1,0 +1,20 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Print some information"
+      ansible.builtin.debug:
+        msg:
+          - "app_name: {{ app_name }}"
+          - "app_path: {{ app_path }}"
+
+    - name: "({{ task_filename }}) Create {{ app_name }} dirs"
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('data') }}"
+        mode: "{{ item.mode | default('0770') }}"
+      loop:
+        - name: ""
+        - name: data

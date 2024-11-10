@@ -1,0 +1,14 @@
+{
+    "oidc_providers": {
+            "authentik": {
+                "display_name": "{{ con_semaphore_oidc_display_name }}",
+                "provider_url": "{{ con_semaphore_oidc_display_provider_url }}",
+                "client_id": "{{ con_semaphore_oidc_display_client_id }}",
+                "client_secret": "{{ con_semaphore_oidc_display_client_secret }}",
+                "redirect_url": "{{ con_semaphore_oidc_display_redirect_url }}",
+                "scopes": ["openid", "profile", "email"],
+                "username_claim": "preferred_username",
+                "name_claim": "preferred_username"
+            }
+    }
+}

@@ -1,0 +1,19 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  when: os_prepare_dnf_automatic_enabled
+  block:
+    - name: "({{ task_filename }}) configure podman-auto-update"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: dnf-automatic.conf.j2
+          dest: /etc/dnf/automatic.conf
+
+    - name: "({{ task_filename }}) enable dnf-automatic timer"
+      ansible.builtin.service:
+        state: restarted
+        enabled: true
+        name: dnf-automatic.timer

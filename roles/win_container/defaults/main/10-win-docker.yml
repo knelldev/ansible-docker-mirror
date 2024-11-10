@@ -1,0 +1,6 @@
+---
+win_docker_version: latest
+
+# Add an ACL for the docker-users group to the docker_engine named pipe
+# Needed for using docker inside windows containers without admin permission.
+win_docker_pipe_group_acl: true

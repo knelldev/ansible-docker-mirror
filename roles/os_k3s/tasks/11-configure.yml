@@ -1,0 +1,57 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  when: os_k3s_install and os_k3s_server and os_k3s_namespace_create
+  become: true
+  block:
+    - name: "({{ task_filename }}) ensure pip"
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+
+    - name: "({{ task_filename }}) install needed pip packages"
+      ansible.builtin.pip:
+        name: "{{ os_k3s_pip_packages }}"
+
+    - name: Create a k8s namespace
+      ansible.builtin.k8s:
+        name: "{{ os_k3s_namespace | lower }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: "({{ task_filename }}) sa-block"
+      when: os_k3s_serviceaccount_create
+      block:
+        - name: "({{ task_filename }}) Template k3s-rbac.yaml"
+          ansible.builtin.template:
+            src: "k3s-rbac.yaml.j2"
+            dest: "/tmp/k3s-rbac.yaml"
+            mode: "0644"
+
+        - name: "({{ task_filename }}) Create a K3S Objects by reading the definition from a file"
+          ansible.builtin.k8s:
+            state: present
+            src: /tmp/k3s-rbac.yaml
+            kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+        # - name: "({{ task_filename }}) shell"
+        #   ansible.builtin.shell: "/usr/local/bin/kubectl -n {{ os_k3s_namespace | lower }} get secret $(/usr/local/bin/kubectl -n {{ os_k3s_namespace | lower }} get serviceaccount/{{ os_k3s_namespace | lower }}-global -o jsonpath='{.secrets[0].name}') -o jsonpath='{.data.token}'| base64 --decode"
+        #   register: sa_token
+
+        # - name: "({{ task_filename }}) show token"
+        #   ansible.builtin.debug:
+        #     msg: "ServiceAccount Token: {{ sa_token.stdout }}"
+
+        - name: "({{ task_filename }}) Remove k3s-rbac.yaml"
+          ansible.builtin.file:
+            path: /tmp/k3s-rbac.yaml
+            state: absent
+
+  # - name: "({{ task_filename }}) include machine.k3s.jenkins role "
+  #   block:
+  #     - name: "({{ task_filename }}) include machine.k3s.jenkins role"
+  #       ansible.builtin.include_role:
+  #         name:  machine.k3s.jenkins
+  #   become: yes
+  #   when: os_k3s_jenkins_add_cluster

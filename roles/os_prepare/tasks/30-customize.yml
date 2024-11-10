@@ -1,0 +1,3 @@
+---
+- name: "({{ task_filename }}) Execute custom script"
+  ansible.builtin.shell: "{{ os_prepare_custom_script }}"

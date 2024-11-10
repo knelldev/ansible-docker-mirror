@@ -1,2 +1,0 @@
-# knell-ansible
-

@@ -1,0 +1,46 @@
+---
+- name: "({{ task_filename }}) Change concurrent setting"
+  community.windows.win_lineinfile:
+    path: '{{ win_gitlab_runner_base_path }}\config.toml'
+    regexp: "^concurrent = [0-9]*"
+    line: "concurrent = {{ win_gitlab_runner_concurrent }}"
+    backrefs: true
+
+- name: "({{ task_filename }}) Register gitlab runner"
+  ansible.windows.win_shell: |
+    gitlab-runner unregister -c {{ win_gitlab_runner_base_path }}\config.toml -n {{ item.description }}
+    gitlab-runner register \
+    --non-interactive \
+    --url "{{ gitlab_external_url }}" \
+    --token '{{ item.token }}' \
+    --executor "{{ item.executor }}" \
+    --docker-image "{{ item.docker_image | default("mcr.microsoft.com/windows/servercore:ltsc2022") }}" \
+    --description "{{ item.description }}"
+  args:
+    chdir: "{{ win_gitlab_runner_base_path }}"
+  loop: "{{ win_gitlab_runner_list }}"
+
+- name: "({{ task_filename }}) Fix shell for docker-windows executors"
+  ansible.windows.win_shell: |
+    $filePath = '{{ win_gitlab_runner_base_path }}\config.toml'
+    $content = Get-Content $filePath -Raw
+    $newContent = $content -replace '(?ms)(executor = "docker-windows"\s+shell = ")pwsh(")' , '$1powershell$2'
+    Set-Content $filePath -Value $newContent
+  args:
+    chdir: "{{ win_gitlab_runner_base_path }}"
+
+- name: "({{ task_filename }}) Add docker named pipe to volumes"
+  ansible.windows.win_shell: |
+    $filePath = '{{ win_gitlab_runner_base_path }}\config.toml'
+    $content = Get-Content $filePath -Raw
+    $newContent = $content -replace '(volumes = \["c:\\\\cache").*(\])' , '$1, "//./pipe/docker_engine://./pipe/docker_engine"$2'
+    Set-Content $filePath -Value $newContent
+  when: win_gitlab_runner_docker_mount_docker_named_pipe
+
+- name: "({{ task_filename }}) Restart and list gitlab runner"
+  ansible.windows.win_shell: |
+    gitlab-runner restart
+    gitlab-runner list -c {{ win_gitlab_runner_base_path }}\config.toml
+  args:
+    chdir: "{{ win_gitlab_runner_base_path }}"
+  register: runner_list

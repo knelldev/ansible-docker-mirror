@@ -1,0 +1,12 @@
+---
+gitlabUrl: {{ k3s_gitlab_runner_gitlab_external_url }}
+runnerToken: {{ k3s_gitlab_runner_token }}
+
+rbac:
+  create: true
+
+concurrent: {{ k3s_gitlab_runner_concurrent }}
+
+runners:
+  config: |
+    {{ k3s_gitlab_runner_config | indent(4) }}

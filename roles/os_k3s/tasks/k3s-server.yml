@@ -1,0 +1,54 @@
+---
+- name: "({{ task_filename }}) execute get-k3s.sh"
+  ansible.builtin.shell: '/tmp/get-k3s.sh {% if os_k3s_node_external_ip_override %}--node-external-ip={{ os_k3s_node_external_ip }}{% endif %} --data-dir={{ app_path }} --kubelet-arg "--root-dir={{ app_path }}/kubelet" {{ os_k3s_server_additional_parameters }}'
+  environment:
+    K3S_NODE_NAME: "{{ ansible_hostname }}"
+    INSTALL_K3S_EXEC: "server"
+    INSTALL_K3S_CHANNEL: "{{ os_k3s_channel }}"
+
+- name: "({{ task_filename }}) Disable schedule on server"
+  ansible.builtin.command: "kubectl taint nodes {{ ansible_hostname }} node-role.kubernetes.io/master:NoSchedule --overwrite --kubeconfig /etc/rancher/k3s/k3s.yaml"
+  when: not os_k3s_server_allow_schedule
+
+- name: "({{ task_filename }}) Create .kube in home"
+  ansible.builtin.file:
+    path: "~/.kube"
+    state: directory
+    mode: "0644"
+
+- name: Copy k3s config to executing user
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: ~/.kube/config
+    remote_src: true
+    mode: "0644"
+
+- name: "({{ task_filename }}) token block"
+  block:
+    - name: "({{ task_filename }}) read token"
+      ansible.builtin.slurp:
+        src: "{{ app_path }}/server/node-token"
+      become: true
+      register: token
+
+    - name: "({{ task_filename }}) set token as fact"
+      ansible.builtin.set_fact:
+        os_k3s_node_token: "{{ token['content'] | b64decode | trim }}"
+      when: token is defined
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: "({{ task_filename }}) show os_k3s_node_token"
+      ansible.builtin.debug:
+        msg: "K3s node-token: {{ hostvars['localhost']['os_k3s_node_token'] }}"
+
+    - name: "({{ task_filename }}) set token as fact"
+      ansible.builtin.set_fact:
+        os_k3s_url: "https://{{ ansible_fqdn }}:6443"
+      when: token is defined
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: "({{ task_filename }}) show os_k3s_url"
+      ansible.builtin.debug:
+        msg: "K3s node-token: {{ hostvars['localhost']['os_k3s_url'] }}"

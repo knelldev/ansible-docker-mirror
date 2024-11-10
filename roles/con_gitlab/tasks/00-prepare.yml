@@ -1,0 +1,49 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Print some information"
+      ansible.builtin.debug:
+        msg:
+          - "app_name: {{ app_name }}"
+          - "app_path: {{ app_path }}"
+
+    - name: "({{ task_filename }}) Create {{ app_name }} dirs"
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('data') }}"
+        mode: "{{ item.mode | default('0755') }}"
+      loop:
+        - name: ""
+          mode: "0770"
+        - name: config
+          owner: root
+          group: root
+        - name: logs
+          owner: root
+          group: root
+        - name: data
+          owner: root
+          group: root
+        - name: ca-custom
+          mode: "0770"
+
+    - name: "({{ task_filename }}) We already got ssl certs block (remove in hopefully a year)"
+      when: con_gitlab_ssl_certs_write
+      block:
+        - name: "({{ task_filename }}) Create gitlab ssl dir"
+          ansible.builtin.file:
+            path: "{{ app_path }}/{{ item }}"
+            state: directory
+            mode: "0770"
+          loop:
+            - config/ssl
+
+        - name: "({{ task_filename }}) Copy certs into ssl dir"
+          ansible.builtin.copy:
+            content: "{{ item.content }}"
+            dest: "{{ item.path }}"
+            mode: "0660"
+          loop: "{{ con_gitlab_ssl_certs_dict }}"

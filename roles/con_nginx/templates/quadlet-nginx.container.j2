@@ -1,0 +1,24 @@
+[Unit]
+Description=nginx
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+ContainerName=nginx
+Image=docker.io/nginx:alpine
+AutoUpdate=registry
+
+# EnvironmentFile={{ app_path }}/.env
+Volume={{ app_path }}/ssl:/etc/nginx/ssl/:z,ro
+Volume={{ app_path }}/html:/usr/share/nginx/html:Z,ro
+Volume={{ app_path }}/conf.d:/etc/nginx/conf.d/:Z,ro
+PublishPort=80:80
+PublishPort=443:443
+Network={{ con_nginx_container_network_name }}.network
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

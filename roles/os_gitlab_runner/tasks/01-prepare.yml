@@ -1,0 +1,32 @@
+---
+- name: "({{ task_filename }}) user/group block"
+  block:
+  - name: "({{ task_filename }}) create system group"
+    group:
+      name: "{{ gitlab_runner_group }}"
+      system: true
+      state: present
+
+  - name: "({{ task_filename }}) create system user"
+    user:
+      name: "{{ gitlab_runner_user }}"
+      shell: /sbin/nologin
+      append: yes
+      createhome: no
+      comment: "Created by Ansible"
+      group: "{{ gitlab_runner_group }}"
+  when: os_create_user
+  become: yes
+
+- name: "({{ task_filename }}) create gitlab-runner paths"
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_group }}"
+    mode: "0755"
+    recurse: yes
+  loop:
+    - "{{ gitlab_runner_base_path }}"
+  become: yes
+

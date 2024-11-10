@@ -1,0 +1,23 @@
+###############################################################################
+# Default values for role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+os_k3s_install: true
+os_k3s_channel: stable # can be latest, stable or specific versions
+
+os_k3s_namespace_create: false
+os_k3s_namespace: "ansible"
+os_k3s_serviceaccount_create: false # create sa for namespace
+
+os_k3s_server: false
+# os_k3s_url: "https://{{ ansible_hostname }}:6443"
+# os_k3s_token: "random-secret-token-password-yey-hello-guys"
+
+os_k3s_node_external_ip_override: false
+os_k3s_node_external_ip: ""
+
+os_k3s_server_allow_schedule: true # allow scheduling pods on master/controller/server node
+
+os_k3s_server_additional_parameters: "" # --kubelet-arg 'cgroup-driver=systemd'
+
+os_k3s_helm_install: true

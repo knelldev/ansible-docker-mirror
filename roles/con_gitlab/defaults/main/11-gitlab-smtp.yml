@@ -1,0 +1,21 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# SMTP Configuration
+con_gitlab_smtp_enable: false
+con_gitlab_smtp_address: "smtp.server"
+con_gitlab_smtp_port: "465"
+con_gitlab_smtp_user_name: "smtp user"
+con_gitlab_smtp_password: "smtp password"
+con_gitlab_smtp_domain: "example.com"
+con_gitlab_smtp_authentication: "login"
+con_gitlab_smtp_enable_starttls_auto: true
+con_gitlab_smtp_tls: false
+con_gitlab_smtp_openssl_verify_mode: "none"
+
+# Email configuration.
+con_gitlab_email_enabled: false
+con_gitlab_email_from: "gitlab@example.com"
+con_gitlab_email_display_name: "Gitlab"
+con_gitlab_email_reply_to: "gitlab@example.com"
