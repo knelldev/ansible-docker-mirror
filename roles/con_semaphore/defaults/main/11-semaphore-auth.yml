@@ -1,5 +1,14 @@
 ---
 # LDAP
+con_semaphore_ldap_enabled: false
+con_semaphore_ldap_host: domain.local
+con_semaphore_ldap_port: 389
+con_semaphore_ldap_tls: "no"
+con_semaphore_ldap_bind_dn: ""
+con_semaphore_ldap_password: ""
+con_semaphore_ldap_dn_search: ""
+con_semaphore_ldap_mapping_uid: ""
+con_semaphore_ldap_search_filter: ""
 
 # OIDC
 con_semaphore_oidc_enabled: false
