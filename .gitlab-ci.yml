@@ -1,6 +1,7 @@
 ---
 include:
-  - local: Default-CI-Docker.gitlab-ci.yml
+  - project: knell-internal/templates
+    file: Default-CI-Docker.gitlab-ci.yml
 
 variables:
   RUN_ANSIBLE_LINT: "true"
