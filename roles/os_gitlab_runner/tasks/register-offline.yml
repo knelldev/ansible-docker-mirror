@@ -1,0 +1,20 @@
+---
+- name: register offline gitlab runner
+  shell: |
+    gitlab-runner register \
+    --non-interactive \
+    --url "{{ runner_item.url }}" \
+    --name "{{ runner_item.runner_name }}" \
+    --registration-token '{{ runner_item.registration.token }}' \
+    --executor "{{ runner_item.executor }}" \
+    --docker-image "{{runner_item.docker_image | default("alpine:latest") }}" \
+    --maintenance-note "Ansible installed runner" \
+    --tag-list "{{ runner_item.tags }}" \
+    --run-untagged="{{ runner_item.run_untagged }}" \
+    --locked="{{ runner_item.locked }}" \
+    --access-level="{{ runner_item.protected }}"
+  register: offline_result
+  retries: 10
+  delay: 5
+  until: offline_result.rc == 0
+

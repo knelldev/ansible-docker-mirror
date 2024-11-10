@@ -1,0 +1,36 @@
+##############################################################################
+# General main for our roles.
+# Does not need any changes and will use an ascending number order for the tasks.
+# Tasks without a leading number will not be included automatically.
+##############################################################################
+---
+# Load additional OS specific configuration from vars folder
+- name: (main.yml) Load vars for os if available
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
+      skip: true
+
+# Find task files which have a leading two digit number
+- name: (main.yml) Find tasks to run
+  ansible.builtin.find:
+    paths: "{{ role_path }}/tasks"
+    use_regex: true
+    patterns:
+      - '^[0-9]{1,2}.*\.yml'
+  register: task_result
+  delegate_to: localhost
+  become: false
+
+# Include tasks in ascending number order. The filename of the task will be set as variable `task_filename`
+- name: (main.yml) Include tasks
+  ansible.builtin.include_tasks: "{{ main_item }}"
+  vars:
+    task_filename: "{{ main_item | replace(role_path + '/tasks/', '') }}"
+  loop: "{{ task_result.files | map(attribute='path') | flatten | sort }}"
+  loop_control:
+    loop_var: main_item

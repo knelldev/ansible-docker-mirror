@@ -1,0 +1,28 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  when: os_container_auto_update
+  block:
+    - name: "({{ task_filename }}) create override dir for podman-auto-update"
+      ansible.builtin.file:
+        path: /etc/systemd/system/podman-auto-update.timer.d/
+        state: directory
+        mode: "0755"
+      when: os_container_auto_update
+
+    - name: "({{ task_filename }}) configure podman-auto-update"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - src: podman-auto-update.timer.j2
+          dest: /etc/systemd/system/podman-auto-update.timer.d/override.conf
+          mode: "0600"
+
+    - name: "({{ task_filename }}) start {{ app_name }}-certbot quadlet"
+      ansible.builtin.systemd_service:
+        state: "{{ os_container_auto_systemd_state }}"
+        daemon_reload: true
+        enabled: "{{ os_container_auto_systemd_enabled }}"
+        name: podman-auto-update.timer

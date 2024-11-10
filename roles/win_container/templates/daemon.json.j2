@@ -1,0 +1,14 @@
+{
+  "group": "docker-users",
+	"data-root": "{{ win_storage_base_path | replace('\\', '\\\\') }}\\docker-data",
+	"experimental": true,
+  "log-driver": "json-file",
+  "log-opts": {
+      "cache-disabled": "false",
+      "cache-max-file": "15",
+      "cache-max-size": "20m",
+      "max-size": "20m",
+      "max-file": "15"
+  },
+  "fixed-cidr" : "192.168.60.0/24"
+}

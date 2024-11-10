@@ -1,0 +1,34 @@
+[Unit]
+Description=gitlab
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+ContainerName=gitlab
+Image=docker.io/gitlab/{{ con_gitlab_edition }}:{{ con_gitlab_version }}
+AutoUpdate=registry
+
+Environment=GITLAB_POST_RECONFIGURE_SCRIPT=/etc/gitlab/post-reconfigure.sh
+# EnvironmentFile={{ app_path }}/.env
+Volume={{ app_path }}/config:/etc/gitlab:Z
+Volume={{ app_path }}/logs:/var/log/gitlab:Z
+Volume={{ app_path }}/data:/var/opt/gitlab:Z
+Volume={{ app_path }}/ca-custom:/usr/local/share/ca-certificates:Z
+
+{% if con_gitlab_expose  %}
+PublishPort=80:80
+PublishPort=443:443
+{% endif %}
+
+PublishPort={{ con_gitlab_shell_ssh_port }}:{{ con_gitlab_shell_ssh_port }}
+
+Network={{ con_gitlab_container_network_name }}.network
+
+ShmSize=256m
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

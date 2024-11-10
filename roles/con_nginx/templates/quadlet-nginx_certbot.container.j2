@@ -1,0 +1,24 @@
+[Unit]
+Description=nginx certbot
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+ContainerName=nginx_certbot-{{ item.cert_url }}
+Image=docker.io/certbot/dns-cloudflare:latest
+AutoUpdate=registry
+
+Exec=certonly --dns-cloudflare --dns-cloudflare-credentials /root/cloudflare.ini --dns-cloudflare-propagation-seconds 30 --agree-tos --email {{ con_nginx_ssl_certbot_email }} --no-eff-email -n --keep-until-expiring -d {{ item.cert_url }}
+
+# EnvironmentFile={{ app_path }}/.env
+Volume={{ app_path }}/cloudflare.ini:/root/cloudflare.ini:Z,ro
+Volume={{ app_path }}/ssl:/etc/letsencrypt:z
+
+Network={{ con_nginx_container_network_name }}.network
+
+[Service]
+Restart=no
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,7 @@
+---
+app_name: "{{ role_name.split('_')[1] }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ storage_base_path }}/{{ app_name }}" # noqa var-naming[no-role-prefix]
+
+os_k3s_pip_packages:
+  - kubernetes
+  - openshift

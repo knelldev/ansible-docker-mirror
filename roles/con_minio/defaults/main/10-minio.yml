@@ -1,0 +1,28 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Podman: minio quadlet
+con_minio_version: latest
+con_minio_container_network_create: true
+con_minio_container_network_name: minio_default
+con_minio_expose: true
+con_minio_systemd_service_state: restarted
+
+# minio: settings
+con_minio_url: "http://localhost:{{ con_minio_port_api }}"
+con_minio_url_console: "http://localhost:{{ con_minio_port_console }}"
+con_minio_port_api: 9000
+con_minio_port_console: 9001
+con_minio_root_user: admin
+con_minio_root_password: admin123
+
+## Add things to minio
+con_minio_identities:
+  - accesskey: name
+    secretkey: secret123
+
+con_minio_buckets:
+  - name: bucket_name
+    expire: false
+    expire_days: 90

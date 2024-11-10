@@ -1,0 +1,15 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+os_prepare_packages:
+  - epel-release
+  - qemu-guest-agent
+  - dnf-automatic
+  - git
+  - nano
+  - htop
+  - ncdu
+  - rpmconf
+
+os_prepare_dnf_automatic_enabled: ture

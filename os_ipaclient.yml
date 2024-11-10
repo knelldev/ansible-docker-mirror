@@ -1,0 +1,8 @@
+# Install ipaclient and join host to freeipa
+---
+- name: "Playbook: os_ipaclient"
+  hosts: "{{ hosts_limit | default('all') }}"
+  become: true
+  roles:
+    - role: freeipa.ansible_freeipa.ipaclient
+      state: present

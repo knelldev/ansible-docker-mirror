@@ -1,0 +1,36 @@
+---
+- name: "({{ task_filename }}) create gitlab-runner paths"
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ win_gitlab_runner_base_path }}"
+
+- name: "({{ task_filename }}) Ensure gitlab-runner user is present"
+  ansible.windows.win_user:
+    name: "{{ win_gitlab_runner_user }}"
+    password: "{{ win_gitlab_runner_pw }}"
+    state: present
+    groups:
+      - docker-users
+  when: win_gitlab_runner_user_create
+
+- name: "({{ task_filename }}) Ensure gitlab-runner profile is present"
+  community.windows.win_user_profile:
+    username: "{{ win_gitlab_runner_user }}"
+    state: present
+  when: win_gitlab_runner_user_create
+
+- name: Add account to Log on as a service
+  ansible.windows.win_user_right:
+    name: SeServiceLogonRight
+    users:
+      - "{{ win_gitlab_runner_user }}"
+    action: add
+
+- name: "({{ task_filename }}) Install or Upgrade installed choco packages"
+  chocolatey.chocolatey.win_chocolatey:
+    name: "gitlab-runner"
+    state: "{{ win_gitlab_runner_state | default('latest') }}"
+    version: "{{ win_gitlab_runner_version | default('') }}"
+    package_params: "/INSTALLDIR={{ win_gitlab_runner_base_path }} /Service:{{ win_gitlab_runner_user }}:{{ win_gitlab_runner_pw }}"

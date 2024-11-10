@@ -1,0 +1,27 @@
+[Unit]
+Description=minio
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+ContainerName=minio
+Image=docker.io/minio/minio:{{ con_minio_version }}
+AutoUpdate=registry
+
+EnvironmentFile={{ app_path }}/.env
+Volume={{ app_path }}/data:/data:Z
+Exec=server --console-address ":9001" /data
+
+{% if con_minio_expose %}
+PublishPort={{ con_minio_port_api }}:9000
+PublishPort={{ con_minio_port_console }}:9001
+{% endif %}
+
+Network={{ con_minio_container_network_name }}.network
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

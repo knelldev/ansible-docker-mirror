@@ -1,0 +1,21 @@
+[Unit]
+Description=semaphore Postgres
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+ContainerName=semaphore_postgres
+Image=docker.io/postgres:14-alpine
+AutoUpdate=registry
+
+EnvironmentFile={{ app_path }}/.env
+Volume={{ app_path }}/semaphore_postgres:/var/lib/postgresql/data:Z
+
+Network={{ con_semaphore_container_network_name }}.network
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

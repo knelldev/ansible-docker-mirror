@@ -1,0 +1,10 @@
+[Unit]
+Description=nginx network
+# This is systemd syntax to wait for the network to be online before starting this service:
+After=network-online.target
+
+[Network]
+NetworkName={{ con_nginx_container_network_name }}
+
+[Install]
+WantedBy=default.target

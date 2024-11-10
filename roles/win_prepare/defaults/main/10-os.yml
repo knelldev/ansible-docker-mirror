@@ -1,0 +1,17 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+win_os_update: true
+
+win_package_list:
+  - name: git
+  - name: 7zip.install
+  - name: python3
+  - name: pwsh
+  - name: notepadplusplus
+  - name: firefoxesr
+
+win_pip_list:
+  []
+  # - requests

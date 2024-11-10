@@ -1,0 +1,46 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# LDAP Configuration.
+con_gitlab_ldap_enabled: false
+con_gitlab_ldap_host: "example.com"
+con_gitlab_ldap_port: "389"
+con_gitlab_ldap_uid: "sAMAccountName"
+con_gitlab_ldap_encryption: "plain" # "start_tls" or "simple_tls" or "plain"
+con_gitlab_ldap_bind_dn: "CN=Username,CN=Users,DC=example,DC=com"
+con_gitlab_ldap_password: "password"
+con_gitlab_ldap_base: "DC=example,DC=com"
+
+# Omniauth - SAML (and technically others)
+con_gitlab_omniauth_enabled: false
+con_gitlab_omniauth_allow_single_sign_on: saml
+con_gitlab_omniauth_sync_email_from_provider: saml
+con_gitlab_omniauth_sync_profile_from_provider: saml
+con_gitlab_omniauth_sync_profile_attributes: email
+con_gitlab_omniauth_auto_sign_in_with_provider: saml
+con_gitlab_omniauth_block_auto_created_users: false
+con_gitlab_omniauth_auto_link_ldap_user: false
+con_gitlab_omniauth_auto_link_saml_user: false
+con_gitlab_omniauth_providers: |
+  [
+    {
+      name: 'saml',
+      groups_attribute: 'http://schemas.xmlsoap.org/claims/Group',
+      admin_groups: ['gitlab-administrators'],
+      args: {
+        assertion_consumer_service_url: 'https://gitlab.company/users/auth/saml/callback',
+        # Shown when navigating to certificates in authentik
+        idp_cert_fingerprint: '4E:1E:CD:67:4A:67:5A:E9:6A:D0:3C:E6:DD:7A:F2:44:2E:76:00:6A',
+        idp_sso_target_url: 'https://authentik.company/application/saml/<gitlab application slug>/sso/binding/redirect/',
+        issuer: 'https://gitlab.company',
+        name_identifier_format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+        attribute_statements: {
+          email: ['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'],
+          first_name: ['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'],
+          nickname: ['http://schemas.goauthentik.io/2021/02/saml/username']
+        }
+      },
+      label: 'authentik'
+    }
+  ]

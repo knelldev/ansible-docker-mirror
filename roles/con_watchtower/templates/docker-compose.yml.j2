@@ -1,0 +1,13 @@
+services:
+  watchtower:
+    image: docker.io/containrrr/watchtower
+    container_name: watchtower
+    hostname: {{ ansible_hostname }}
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - /root/.docker/config.json:/config.json # Optional if you use private repos
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: Europe/Berlin
+      {{ con_watchtower_container_environment | indent(6) }}

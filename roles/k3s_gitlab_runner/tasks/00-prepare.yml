@@ -1,0 +1,21 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  when: k3s_gitlab_runner_namespace_create
+  become: true
+  block:
+    - name: "({{ task_filename }}) ensure pip"
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+
+    - name: "({{ task_filename }}) install needed pip packages"
+      ansible.builtin.pip:
+        name: "{{ os_k3s_pip_packages }}"
+
+    - name: Create a k8s namespace
+      ansible.builtin.k8s:
+        name: "{{ k3s_gitlab_runner_namespace | lower }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: /etc/rancher/k3s/k3s.yaml

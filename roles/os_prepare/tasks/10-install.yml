@@ -1,0 +1,25 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Ensure epel-release is installed"
+      ansible.builtin.dnf:
+        name: "epel-release"
+        state: present
+
+    - name: "({{ task_filename }}) Install os_os_prepare_packagespa"
+      ansible.builtin.dnf:
+        name: "{{ os_prepare_packages }}"
+        state: present
+
+    - name: "({{ task_filename }}) Create data dirs"
+      ansible.builtin.file:
+        path: "{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "0770"
+      loop:
+        - name: "{{ storage_base_path }}"
+          owner: root
+          group: data

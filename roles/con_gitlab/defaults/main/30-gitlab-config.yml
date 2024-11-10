@@ -1,0 +1,32 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Gitlab: URLs
+## General Settings
+con_gitlab_config_signup_enabled: false
+con_gitlab_config_can_create_group: false
+# Use only if you have something im place to place users in groups - new users wont be able to do aynthing with this.
+con_gitlab_config_allow_project_creation_for_guest_and_below: true
+con_gitlab_config_auto_devops_enabled: false
+con_gitlab_import_sources: '["github", "bitbucket_server", "git", "gitlab_project", "manifest"]'
+# Forward after sign out
+con_gitlab_after_sign_out_path: ""
+# Enable to get extra features for gitlab like Maintenance mode
+# https://docs.gitlab.com/ee/administration/settings/usage_statistics.html#registration-features-program
+con_gitlab_usage_metrics: true
+
+## Security
+con_gitlab_config_admin_mode: true
+con_gitlab_require_admin_two_factor_authentication: false
+con_gitlab_two_factor_grace_period: 48
+
+# Add custom settings or feature flags
+# You can get your current settings via the console
+# gitlab-rails console
+# ApplicationSetting.current
+con_gitlab_config_custom: |
+  # - Custom gitlab rails config via Ansible
+  # - use like this:
+  # ApplicationSetting.last.update(signup_enabled: false)
+  # Feature.enable(:web_ide_extensions_marketplace)

@@ -1,0 +1,49 @@
+---
+- name: Grab current existing users
+  uri:
+    url: "{{ gitlab_url }}/api/v4/groups/"
+    method: GET
+    validate_certs: no
+    status_code: 200
+    body_format: json
+    headers:
+          Content-Type: application/json
+          Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token  }}"
+  register: gitlab_existing_groups
+
+- name: Concatenate a list to string
+  set_fact:
+    gitlab_group_id: "{{ gitlab_existing_groups.json | json_query(query) }}"
+  vars:
+    query: "[?name=='{{ runner_item.registration.name }}'].id | [0]"
+
+- name: reset group token and grab token
+  uri:
+    url: "{{ gitlab_url }}/api/v4/groups/{{ gitlab_group_id }}/runners/reset_registration_token"
+    method: POST
+    validate_certs: no
+    status_code: 200,201
+    body_format: json
+    headers:
+        Content-Type: application/json
+        Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token }}"
+  register: gitlab_group_token
+
+- name: register group gitlab runner
+  shell: |
+    gitlab-runner register \
+    --non-interactive \
+    --url "{{ runner_item.url }}" \
+    --name "{{ runner_item.runner_name }}" \
+    --registration-token '{{ gitlab_group_token.json.token }}' \
+    --executor "{{ runner_item.executor }}" \
+    --docker-image "{{runner_item.docker_image | default("alpine:latest") }}" \
+    --maintenance-note "Ansible installed runner" \
+    --tag-list "{{ runner_item.tags }}" \
+    --run-untagged="{{ runner_item.run_untagged }}" \
+    --locked="{{ runner_item.locked }}" \
+    --access-level="{{ runner_item.protected }}"
+  register: group_result
+  retries: 10
+  delay: 5
+  until: group_result.rc == 0

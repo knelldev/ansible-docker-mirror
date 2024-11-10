@@ -1,0 +1,11 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+os_container_data_root: "{{ storage_base_path }}/containers/storage"
+
+os_container_auto_update: true
+os_container_auto_update_schedule: Wed *-*-* 02:00:00
+
+os_container_auto_systemd_enabled: true
+os_container_auto_systemd_state: restarted

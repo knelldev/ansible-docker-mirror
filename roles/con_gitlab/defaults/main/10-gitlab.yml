@@ -1,0 +1,50 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Podman: Gitlab quadlet
+con_gitlab_edition: "gitlab-ee"
+con_gitlab_version: "latest" # <version>-ee.0
+con_gitlab_container_network_create: true
+con_gitlab_container_network_name: gitlab_default
+con_gitlab_shell_ssh_port: 2022
+con_gitlab_expose: true
+con_gitlab_systemd_service_state: restarted
+
+# Gitlab: URLs
+con_gitlab_base_domain: example.com
+con_gitlab_domain: "gitlab.{{ con_gitlab_base_domain }}"
+con_gitlab_external_url: "http://{{ con_gitlab_domain }}/"
+con_gitlab_registry_external_url: "http://registry.{{ con_gitlab_base_domain }}"
+con_gitlab_pages_external_url: "http://pages.{{ con_gitlab_base_domain }}"
+
+## defautls for the gitlab.rb settings
+## Gitlab: General config.
+con_gitlab_config_template: "gitlab.rb.j2"
+con_gitlab_backup_keep_time: "604800"
+con_gitlab_time_zone: "Europe/Berlin"
+con_gitlab_default_theme: "2"
+
+## Gitlab: NGINX Settings
+con_gitlab_nginx_enable: true
+con_gitlab_nginx_redirect_http_to_https: false
+con_gitlab_nginx_listen_https: nil
+
+## Gitlab: Registry configuration.
+con_gitlab_registry_enable: false
+con_gitlab_registry_nginx_enabled: true
+con_gitlab_registry_nginx_listen_https: nil
+con_gitlab_registry_nginx_redirect_http_to_https: false
+
+## Gitlab: Pages configuration.
+con_gitlab_pages_enable: false
+con_gitlab_pages_nginx_enabled: true
+con_gitlab_pages_nginx_listen_https: nil
+con_gitlab_pages_nginx_redirect_http_to_https: false
+con_gitlab_pages_namespace_in_path: false
+
+# Custom settings block
+# Be careful to not add configs from above.
+con_gitlab_rb_custom: |
+  # Add multiline config from gitlab.rb
+  # here

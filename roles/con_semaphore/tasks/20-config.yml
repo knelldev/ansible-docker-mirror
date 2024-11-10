@@ -1,0 +1,21 @@
+---
+- name: "({{ task_filename }}) oidc block"
+  become: true
+  when: con_semaphore_oidc_enabled
+  block:
+    - name: "({{ task_filename }}) read generated config.json"
+      ansible.builtin.slurp:
+        src: "{{ app_path }}/config/config.json"
+      register: register_semaphore_config
+
+    - name: "({{ task_filename }}) add oidc to config.json"
+      ansible.builtin.copy:
+        content: "{{ register_semaphore_config.content | b64decode | from_json | combine(lookup('template', 'config.json.j2') | to_json | from_json) | to_nice_json }}"
+        dest: "{{ app_path }}/config/config.json"
+        mode: "0600"
+
+    - name: "({{ task_filename }}) start semaphore quadlet"
+      ansible.builtin.systemd_service:
+        state: "{{ con_semaphore_systemd_service_state }}"
+        daemon_reload: true
+        name: semaphore

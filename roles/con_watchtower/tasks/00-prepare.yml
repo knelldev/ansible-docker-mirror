@@ -1,0 +1,10 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  block:
+    - name: "({{ task_filename }}) Create watchtower dirs"
+      ansible.builtin.file:
+        path: "{{ watchtower_path }}/"
+        state: directory
+        mode: "0644"
+
+  become: true

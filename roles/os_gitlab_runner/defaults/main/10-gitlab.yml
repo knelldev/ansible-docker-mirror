@@ -1,0 +1,97 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Gitlab Settings
+gitlab_url: "http://192.168.60.25:{{ gitlab_ports.gitlab_ui }}{{ gitlab_context_path  }}"
+gitlab_context_path: /gitlab
+
+gitlab_admin_user: ansible-admin
+gitlab_admin_password: p4ssword
+
+gitlab_ports:
+  gitlab_ui: 8083
+  gitlab_ssh: 10022
+
+# Gitlab runner settings
+gitlab_runner_version: latest # or something like v15.6.0
+
+gitlab_runner_user: gitlab-runner
+gitlab_runner_group: gitlab-runner
+
+gitlab_runner_registration_token: ""
+gitlab_runner_base_path: "{{ storage_base_path }}/gitlab-runner"
+
+# List of gitlab runners on this machine
+gitlab_runner_list:
+  # - url: "{{ gitlab_url }}"
+  #   runner_name: "{{ ansible_hostname }}"
+  #   registration:
+  #     type: offline
+  #     token: "{{ gitlab_runner_registration_token }}"
+  #   executor: "shell"
+  #   tags: "{{ ansible_hostname }},linux,docker"
+  #   run_untagged: "true"
+  #   locked: "false"
+  #   protected: "not_protected"
+  - url: "{{ gitlab_url }}"
+    runner_name: "{{ ansible_hostname }}-shared-online"
+    registration:
+      type: shared
+      user: "{{ gitlab_admin_user }}"
+      password: "{{ gitlab_admin_password }}"
+    executor: "shell"
+    tags: "{{ ansible_hostname }},linux,docker"
+    run_untagged: "true"
+    locked: "false"
+    protected: "not_protected"
+  - url: "{{ gitlab_url }}"
+    runner_name: "{{ ansible_hostname }}-shared-docker-online"
+    registration:
+      type: shared
+      user: "{{ gitlab_admin_user }}"
+      password: "{{ gitlab_admin_password }}"
+    executor: "docker"
+    docker_image: "ubuntu:focal"
+    tags: "{{ ansible_hostname }}-docker,linux,docker"
+    run_untagged: "true"
+    locked: "false"
+    protected: "not_protected"
+  - url: "{{ gitlab_url }}"
+    runner_name: "{{ ansible_hostname }}-group-online"
+    registration:
+      type: group
+      name: "testgroup"
+      user: "{{ gitlab_admin_user }}"
+      password: "{{ gitlab_admin_password }}"
+    executor: "shell"
+    tags: "{{ ansible_hostname }},linux,docker"
+    run_untagged: "true"
+    locked: "false"
+    protected: "not_protected"
+  - url: "{{ gitlab_url }}"
+    runner_name: "{{ ansible_hostname }}-group-docker-online"
+    registration:
+      type: group
+      name: "testgroup"
+      user: "{{ gitlab_admin_user }}"
+      password: "{{ gitlab_admin_password }}"
+    executor: "docker"
+    tags: "{{ ansible_hostname }}-docker,linux,docker"
+    run_untagged: "true"
+    locked: "false"
+    protected: "not_protected"
+  - url: "{{ gitlab_url }}"
+    runner_name: "{{ ansible_hostname }}-project-online"
+    registration:
+      type: project
+      name: "testproject"
+      user: "{{ gitlab_admin_user }}"
+      password: "{{ gitlab_admin_password }}"
+    executor: "shell"
+    tags: "{{ ansible_hostname }},linux,docker"
+    run_untagged: "true"
+    locked: "false"
+    protected: "not_protected"
+
+

@@ -1,0 +1,8 @@
+---
+- name: "Playbook: container_gitlab_install"
+  hosts: "{{ hosts_limit | default('all') }}"
+  roles:
+    # - os_prepare
+    # - os_hardening
+    # - os_container
+    - con_gitlab

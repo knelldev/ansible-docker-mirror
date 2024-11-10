@@ -1,0 +1,23 @@
+---
+- name: "({{ task_filename }}) Helm install block"
+  when: os_k3s_helm_install
+  block:
+    - name: "({{ task_filename }}) Download get-helm.sh"
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+        dest: /tmp/get-helm.sh
+        mode: "0700"
+        force: true
+
+    - name: "({{ task_filename }}) execute get-helm.sh"
+      ansible.builtin.shell: "/tmp/get-helm.sh"
+      args:
+        executable: /bin/bash
+      ignore_errors: true
+      register: os_k3s_register_helm_output
+      changed_when: "'is already latest' not in os_k3s_register_helm_output.stdout"
+
+    - name: "({{ task_filename }}) ensure permission of helm binary"
+      ansible.builtin.file:
+        dest: /usr/local/bin/helm
+        mode: "0755"

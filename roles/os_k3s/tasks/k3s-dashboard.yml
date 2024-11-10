@@ -1,0 +1,29 @@
+# ---
+# - name: "({{ task_filename }}) Template k3s-rbac-dashboard.yaml"
+#   ansible.builtin.template:
+#     src: "k3s-rbac-dashboard.yaml.j2"
+#     dest: "/tmp/k3s-rbac-dashboard.yaml"
+
+# - name: "Download and install Dashboard"
+#   ansible.builtin.shell: |
+#     VERSION_KUBE_DASHBOARD=$(curl -w '%{url_effective}' -I -L -s -S https://github.com/kubernetes/dashboard/releases/latest -o /dev/null | sed -e 's|.*/||')
+#     sudo k3s kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/${VERSION_KUBE_DASHBOARD}/aio/deploy/recommended.yaml
+
+# - name: "({{ task_filename }}) Create a K3S Dashboard RBAC"
+#   ansible.builtin.k8s:
+#     state: present
+#     src: /tmp/k3s-rbac-dashboard.yaml
+#     kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+# - name: "shell"
+#   ansible.builtin.shell: "kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token'"
+#   register: dashboard_token
+
+# - name: "({{ task_filename }}) show token"
+#   ansible.builtin.debug:
+#     msg: "Dashboard Admin Token: {{ dashboard_token.stdout }}"
+
+# - name: "({{ task_filename }}) Remove k3s-rbac-dashboard.yaml"
+#   ansible.builtin.file:
+#     path: /tmp/k3s-rbac-dashboard.yaml
+#     state: absent

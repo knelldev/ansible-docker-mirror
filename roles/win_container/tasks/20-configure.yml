@@ -1,0 +1,75 @@
+---
+- name: "({{ task_filename }}) Create a new group"
+  ansible.builtin.win_group:
+    name: docker-users
+    description: docker-users group
+    state: present
+
+# - name: Add a local and domain user to a local group
+#   win_group_membership:
+#     name: docker-users
+#     members: '{{ item.domain }}\{{ item.user }}'
+#     state: present
+#   loop: "{{ win_docker_users }}"
+
+- name: "({{ task_filename }}) Template docker daemon.json"
+  ansible.builtin.win_template:
+    src: "daemon.json.j2"
+    dest: 'C:\ProgramData\docker\config\daemon.json'
+
+- name: "({{ task_filename }}) Restart docker servioce"
+  ansible.builtin.win_service:
+    name: docker
+    state: restarted
+
+# - name: "({{ task_filename }} Add docker-users to docker_engine pipe ACL"
+#   ansible.windows.win_acl:
+#     path: //./pipe/docker_engine
+#     user: docker-users
+#     rights: FullControl
+#     type: allow
+#     state: present
+
+- name: "({{ task_filename }} Add docker-users to docker_engine pipe ACL"
+  ansible.windows.win_powershell:
+    script: |
+      # Define the named pipe's path
+      $pipeName = "//./pipe/docker_engine"
+      $identity = "$env:computername\docker-users"
+
+      $maxRetries = 3000
+      $retryDelay = 100 # 0,1 second delay
+
+      for ($i = 0; $i -lt $maxRetries; $i++) {
+          try {
+              $acl = Get-Acl $pipeName
+              break # Exit the loop if successful
+          } catch {
+              if ($_.Exception.Message -match "error code 231") { # Check for Error 231 in the message
+                  if ($i -lt $maxRetries - 1) {
+                      Start-Sleep -Milliseconds $retryDelay
+                  } else {
+                      Write-Error "Failed to get ACL after $maxRetries retries. Pipe is likely busy."
+                  }
+              } else {
+                  throw # Re-throw other exceptions
+              }
+          }
+      }
+
+      if ($acl) {
+        # Display or further process the ACL
+        $acl | Format-Table -AutoSize
+
+        # Set properties
+        $fileSystemRights = "FullControl"
+        $type = "Allow"
+        # Create new rule
+        $fileSystemAccessRuleArgumentList = $identity, $fileSystemRights, $type
+        $fileSystemAccessRule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule -ArgumentList $fileSystemAccessRuleArgumentList
+        # Apply new rule
+        $acl.SetAccessRule($fileSystemAccessRule)
+        Set-Acl -Path $pipename -AclObject $acl
+      }
+    executable: pwsh
+  when: win_docker_pipe_group_acl

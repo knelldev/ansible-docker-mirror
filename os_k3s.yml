@@ -1,0 +1,5 @@
+---
+- name: "Playbook: os_k3s"
+  hosts: "{{ hosts_limit | default('all') }}"
+  roles:
+    - os_k3s

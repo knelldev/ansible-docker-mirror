@@ -1,0 +1,6 @@
+---
+collections:
+  # Install a collection from Ansible Galaxy.
+  - name: freeipa.ansible_freeipa
+    version: ">=1.13.2"
+    source: https://galaxy.ansible.com

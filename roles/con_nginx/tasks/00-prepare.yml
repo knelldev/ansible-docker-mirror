@@ -1,0 +1,24 @@
+---
+- name: "({{ task_filename }}) block for become=true"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Create {{ app_name }} dirs"
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "0755"
+      loop:
+        - name: ""
+          owner: root
+          group: data
+        - name: ssl
+          owner: 101
+          group: 101
+        - name: html
+          owner: 101
+          group: 101
+        - name: conf.d
+          owner: 101
+          group: 101

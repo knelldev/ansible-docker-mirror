@@ -1,0 +1,9 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+con_watchtower_path: "{{ storage_base_path }}/watchtower"
+
+con_watchtower_container_environment: |
+  WATCHTOWER_SCHEDULE: "0 0 2 ? * WED"
+  WATCHTOWER_CLEANUP: "true"

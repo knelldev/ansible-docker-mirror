@@ -1,0 +1,4 @@
+---
+os_prepare_custom_script:
+  # Add script here for easy customization
+  echo "This could be your customization"

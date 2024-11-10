@@ -1,0 +1,5 @@
+---
+- name: "Playbook: os_prepare"
+  hosts: "{{ hosts_limit | default('all') }}"
+  roles:
+    - os_prepare

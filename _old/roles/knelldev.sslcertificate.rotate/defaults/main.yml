@@ -1,4 +1,0 @@
----
-certificate_rotate: False
-ssl_key_path: /opt/nginx/ssl/ssl.key
-ssl_key_cert: /opt/nginx/ssl/ssl.crt

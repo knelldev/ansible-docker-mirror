@@ -1,0 +1,23 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Setting sof other roles
+# Gitlab settings
+con_gitlab_external_url: "http://example.com/" # noqa var-naming[no-role-prefix]
+k3s_gitlab_runner_gitlab_external_url: "{{ con_gitlab_external_url }}"
+
+# Kubernetes settings
+k3s_gitlab_runner_namespace_create: true
+k3s_gitlab_runner_namespace: "gitlab-runner"
+k3s_gitlab_runner_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+
+# Runner settings
+# Needs to be get from UI
+k3s_gitlab_runner_token: token
+k3s_gitlab_runner_concurrent: 50
+
+k3s_gitlab_runner_config: |
+  [[runners]]
+    [runners.kubernetes]
+      image = "python:3"

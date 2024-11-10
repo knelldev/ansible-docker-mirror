@@ -1,0 +1,26 @@
+[Unit]
+Requires=semaphore_postgres.service
+After=semaphore_postgres.service
+
+[Container]
+ContainerName=semaphore
+Image=docker.io/semaphoreui/semaphore:latest
+AutoUpdate=registry
+
+EnvironmentFile={{ app_path }}/.env
+EnvironmentFile={{ app_path }}/key.env
+
+{% if con_semaphore_expose  %}
+PublishPort={{ con_semaphore_port }}:3000
+{% endif %}
+
+Volume={{ app_path }}/config:/etc/semaphore:Z
+
+Network={{ con_semaphore_container_network_name }}.network
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
