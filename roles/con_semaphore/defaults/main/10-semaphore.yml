@@ -7,7 +7,7 @@ con_semaphore_port: 3000
 con_semaphore_url: "http://localhost:{{ con_semaphore_port }}"
 
 con_semaphore_container_network_create: true
-con_semaphore_container_network_name: con_semaphore_default
+con_semaphore_container_network_name: semaphore_default
 
 con_semaphore_systemd_service_state: restarted
 
