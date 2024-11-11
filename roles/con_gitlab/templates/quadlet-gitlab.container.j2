@@ -20,7 +20,7 @@ PublishPort=80:80
 PublishPort=443:443
 {% endif %}
 
-PublishPort={{ con_gitlab_shell_ssh_port }}:{{ con_gitlab_shell_ssh_port }}
+PublishPort={{ con_gitlab_shell_ssh_port }}:22
 
 Network={{ con_gitlab_container_network_name }}.network
 
