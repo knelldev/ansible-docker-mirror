@@ -17,3 +17,4 @@
         values: "{{ lookup('template', 'values.yaml.j2') | from_yaml }}"
         kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
         binary_path: /usr/local/bin/helm
+        validate_certs: "{{ http.ssl_verify }}"
