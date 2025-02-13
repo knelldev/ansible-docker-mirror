@@ -10,6 +10,9 @@
   ansible.windows.win_user:
     name: "{{ win_gitlab_runner_user }}"
     password: "{{ win_gitlab_runner_pw }}"
+    password_never_expires: true
+    account_expires: never
+    account_locked: false
     state: present
     groups:
       - docker-users
