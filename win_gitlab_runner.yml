@@ -1,5 +1,5 @@
 ---
-- hosts: all
+- hosts: "{{ hosts_limit | default('all') }}"
   roles:
     - win_prepare
     - win_container

@@ -1,3 +1,4 @@
+---
 - hosts: "{{ hosts_limit | default('all') }}"
   roles:
     - win_gitlab_runner
