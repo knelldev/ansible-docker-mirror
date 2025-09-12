@@ -1,9 +1,7 @@
 # Install ipaclient and join host to freeipa
 # https://galaxy.ansible.com/ui/repo/published/freeipa/ansible_freeipa/content/role/ipaclient/
 ---
-- name: "Playbook: os_ipaclient"
+- name: "Playbook: pve_vm_clone"
   hosts: "{{ hosts_limit | default('all') }}"
-  become: true
   roles:
-    - role: freeipa.ansible_freeipa.ipaclient
-      state: present
+    - pve_vm_clone

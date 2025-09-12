@@ -1,0 +1,87 @@
+---
+- name: "({{ task_filename }}) Block: local connection"
+  connection: local
+  delegate_to: localhost
+  block:
+    - name: "({{ task_filename }}) Validate Proxmox connection details are provided"
+      ansible.builtin.fail:
+        msg: >
+          Proxmox connection details (pve_vm_clone_api_host, pve_vm_clone_api_user, pve_vm_clone_api_password) are required.
+          Please set them in your inventory, playbook, or as environment variables."
+      when: pve_vm_clone_api_host is not defined or pve_vm_clone_api_user is not defined or pve_vm_clone_api_password is not defined
+
+    - name: "({{ task_filename }}) Ensure Proxmox VM is created"
+      community.general.proxmox_kvm:
+        api_host: "{{ pve_vm_clone_api_host }}"
+        api_port: "{{ pve_vm_clone_api_port }}"
+        api_user: "{{ pve_vm_clone_api_user }}"
+        api_password: "{{ pve_vm_clone_api_password }}"
+        node: "{{ pve_vm_clone_node }}"
+        vmid: "{{ pve_vm_clone_vmid | default(omit) }}"
+        name: "{{ pve_vm_clone_vm_name }}"
+        pool: "{{ pve_vm_clone_pool | default(omit) }}"
+        clone: "{{ pve_vm_clone_template }}"
+        full: "{{ true if pve_vm_clone_type == 'full' else false }}"
+        state: present
+        format: "{{ pve_vm_clone_disk_format }}"
+        storage: "{{ pve_vm_clone_disk_storage }}"
+        timeout: "{{ pve_vm_clone_timeout }}"
+      register: vm_state
+
+    - name: "({{ task_filename }}) Ensure Proxmox VM is configured"
+      community.general.proxmox_kvm:
+        api_host: "{{ pve_vm_clone_api_host }}"
+        api_port: "{{ pve_vm_clone_api_port }}"
+        api_user: "{{ pve_vm_clone_api_user }}"
+        api_password: "{{ pve_vm_clone_api_password }}"
+        node: "{{ pve_vm_clone_node }}"
+        vmid: "{{ vm_state.vmid }}"
+        name: "{{ pve_vm_clone_vm_name }}"
+        pool: "{{ pve_vm_clone_pool | default(omit) }}"
+        state: present
+        update: true
+        cores: "{{ pve_vm_clone_cores | default(omit) }}"
+        memory: "{{ pve_vm_clone_memory | default(omit) }}"
+        timeout: "{{ pve_vm_clone_timeout }}"
+        ciuser: "{{ pve_vm_clone_ci_user | default(omit) }}"
+        sshkeys: "{{ pve_vm_clone_ci_ssh_key | default(omit) }}"
+        ipconfig:
+          ipconfig0: "{{ pve_vm_clone_ci_ipconfig | default(omit) }}"
+        nameservers: "{{ pve_vm_clone_ci_nameserver | default(omit) }}"
+        searchdomains: "{{ pve_vm_clone_ci_searchdomain | default(omit) }}"
+      register: vm_state
+
+    - name: "({{ task_filename }}) Grow existing disk"
+      community.general.proxmox_disk:
+        api_host: "{{ pve_vm_clone_api_host }}"
+        api_port: "{{ pve_vm_clone_api_port }}"
+        api_user: "{{ pve_vm_clone_api_user }}"
+        api_password: "{{ pve_vm_clone_api_password }}"
+        vmid: "{{ vm_state.vmid }}"
+        disk: "{{ item.disk_id }}"
+        size: "{{ item.disk_size }}"
+        state: resized
+      loop: "{{ pve_vm_clone_resize_disk_list }}"
+      when: pve_vm_clone_resize_disk_list is defined
+
+    - name: "({{ task_filename }}) Start VM"
+      community.general.proxmox_kvm:
+        api_host: "{{ pve_vm_clone_api_host }}"
+        api_port: "{{ pve_vm_clone_api_port }}"
+        api_user: "{{ pve_vm_clone_api_user }}"
+        api_password: "{{ pve_vm_clone_api_password }}"
+        node: "{{ pve_vm_clone_node }}"
+        vmid: "{{ vm_state.vmid }}"
+        name: "{{ pve_vm_clone_vm_name }}"
+        state: started
+
+    - name: "({{ task_filename }}) Wait for SSH port to become available"
+      ansible.builtin.wait_for:
+        host: "{{ pve_vm_clone_ci_ipconfig | regex_search('ip=([^/]+)', '\\1') | first }}"
+        port: "{{ pve_vm_clone_ssh_port }}"
+        delay: 10
+        timeout: 5
+        search_regex: OpenSSH
+      retries: 1
+      delay: 5
+      when: pve_vm_clone_ci_ipconfig is defined and pve_vm_clone_ci_ipconfig | length > 0

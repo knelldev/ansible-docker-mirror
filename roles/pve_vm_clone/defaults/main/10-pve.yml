@@ -1,0 +1,51 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Proxmox connection details (ensure these are set in your inventory or environment variables)
+pve_vm_clone_api_host: pve.example.com
+pve_vm_clone_api_user: root@pam
+pve_vm_clone_api_password: "your_password"
+pve_vm_clone_api_port: 8006
+
+# Proxmox Node Configuration
+pve_vm_clone_node: "pve"
+pve_vm_clone_template: "ubuntu-2204-cloudinit-template"
+pve_vm_clone_vm_name: "ansible-vm"
+# pve_vm_clone_vmid: "" # Optional, Proxmox will pick the next available ID if omitted
+pve_vm_clone_pool: "" # Optional: specify a resource pool for the VM
+
+# VM Sizing Configuration (Optional: will use template defaults if not set)
+# pve_vm_clone_cores: "" # e.g., 2
+# pve_vm_clone_memory: "" # e.g., 2048 (in MB)
+
+# VM Disk Configuration
+pve_vm_clone_disk_storage: "local-lvm"
+pve_vm_clone_disk_format: "qcow2" # e.g., qcow2, raw
+pve_vm_clone_type: "full" # "full" or "linked"
+
+## resize disk
+pve_vm_clone_resize_disk_list:
+  - disk_id: "virtio0"
+    disk_size: "" # e.g., "50G". If null, uses template's disk size.
+
+# Network/Connection
+pve_vm_clone_ssh_port: 22
+pve_vm_clone_timeout: 300 # Timeout in seconds for the Proxmox create/clone operation.
+
+# --- Cloud-Init Configuration ---
+pve_vm_clone_ci_user: "ubuntu"
+pve_vm_clone_ci_ssh_key: "" # Public SSH key content (required for SSH access)
+
+# --- Full Network Config (Advanced/Override) ---
+# Use this if you need to specify more complex options like IPv6.
+# If set, this will be used instead of the partial config above.
+# pve_vm_clone_ci_ipconfig: null # e.g., "ip=192.168.1.100/24,gw=192.168.1.1"
+
+# --- Other Cloud-Init Settings ---
+# pve_vm_clone_ci_nameserver:
+#   - "" # e.g., "8.8.8.8"
+# pve_vm_clone_ci_searchdomain: "" # e.g., "example.com"
+
+# The module handles resizing the disk as a post-clone action
+# disk: "{{ 'scsi0,size=' + pve_vm_clone_disk_size if pve_vm_clone_disk_size else omit }}"
