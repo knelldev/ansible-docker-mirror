@@ -1,9 +1,9 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: "({{ task_filename }}) configure dnf-automatic"
   become: true
   when: os_prepare_dnf_automatic_enabled
   block:
-    - name: "({{ task_filename }}) configure podman-auto-update"
+    - name: "({{ task_filename }}) configure dnf-automatic.conf"
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -17,3 +17,52 @@
         state: restarted
         enabled: true
         name: dnf-automatic.timer
+
+- name: "({{ task_filename }}) configure journald"
+  become: true
+  when: os_prepare_journald_configure
+  block:
+    - name: "({{ task_filename }}) create journald config override dir"
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d/
+        state: directory
+        mode: "0755"
+
+    - name: "({{ task_filename }}) remove journald config override"
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d/00-ansible.conf
+        state: absent
+
+    - name: "({{ task_filename }}) configure journald limits with ini_file"
+      ansible.builtin.ini_file:
+        path: /etc/systemd/journald.conf.d/00-ansible.conf
+        section: "Journal"
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        create: true
+        mode: '{{ item.mode | default("0644") }}'
+      loop:
+        - { option: "Compress", value: "{{ 'yes' if os_prepare_journald_compress else 'no' }}" }
+        - { option: "SystemMaxUse", value: "{{ os_prepare_journald_system_max_use }}" }
+        - { option: "SystemKeepFree", value: "{{ os_prepare_journald_system_keep_free }}" }
+        - { option: "SystemMaxFileSize", value: "{{ os_prepare_journald_system_max_file_size }}" }
+        - { option: "MaxRetentionSec", value: "{{ os_prepare_journald_max_retention_sec }}" }
+        - { option: "MaxFileSec", value: "{{ os_prepare_journald_max_file_sec }}" }
+      when: item.value | string | length > 0
+      loop_control:
+        label: "{{ item.option }}"
+
+    - name: "({{ task_filename }}) enable systemd-journald"
+      ansible.builtin.service:
+        state: restarted
+        enabled: true
+        name: systemd-journald
+
+- name: "({{ task_filename }}) configure logrotate"
+  become: true
+  block:
+    - name: "({{ task_filename }}) Manage compression in logrotate.conf"
+      ansible.builtin.lineinfile:
+        path: /etc/logrotate.conf
+        regexp: '^\s*#?\s*compress\s*$'
+        line: "{{ 'compress' if os_prepare_logrotate_compress else '#compress' }}"
