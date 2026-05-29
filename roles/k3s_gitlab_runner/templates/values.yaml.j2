@@ -1,6 +1,6 @@
 ---
 gitlabUrl: {{ k3s_gitlab_runner_gitlab_external_url }}
-runnerToken: {{ k3s_gitlab_runner_token }}
+runnerToken: {{ item.token | default(k3s_gitlab_runner_token) }}
 
 rbac:
   create: true
