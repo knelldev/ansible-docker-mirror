@@ -10,7 +10,7 @@
 
     - name: Deploy gitlab-runner with values
       kubernetes.core.helm:
-        name: gitlab-runner
+        name: "{{ item.name }}"
         chart_ref: gitlab/gitlab-runner
         namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
         update_repo_cache: true
@@ -18,3 +18,4 @@
         kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
         binary_path: /usr/local/bin/helm
         validate_certs: "{{ http.ssl_verify }}"
+      loop: "{{ k3s_gitlab_runner_config_list }}"
