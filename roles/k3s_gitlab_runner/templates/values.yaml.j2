@@ -9,4 +9,4 @@ concurrent: {{ k3s_gitlab_runner_concurrent }}
 
 runners:
   config: |
-    {{ k3s_gitlab_runner_config | indent(4) }}
+    {{ item.config | indent(4) }}

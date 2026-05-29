@@ -17,18 +17,19 @@ k3s_gitlab_runner_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 k3s_gitlab_runner_token: token
 k3s_gitlab_runner_concurrent: 50
 
-k3s_gitlab_runner_config: |
-  [[runners]]
-    [runners.kubernetes]
-      image = "python:3"
-      pull_policy = "always"
-      allowed_pull_policies = ["always", "if-not-present", "never"]
-      # [runners.cache]
-      #   Type = "s3"
-      #   Shared = true
-      #   [runners.cache.s3]
-      #     ServerAddress = "172.17.152.121:9000"
-      #     AccessKey = "S3gitlab"
-      #     SecretKey = "S3gitlab"
-      #     BucketName = "gitlab-runner-s3-cache"
-      #     Insecure = true
+k3s_gitlab_runner_config_list:
+  - |
+    [[runners]]
+      [runners.kubernetes]
+        image = "python:3"
+        pull_policy = "always"
+        allowed_pull_policies = ["always", "if-not-present", "never"]
+        # [runners.cache]
+        #   Type = "s3"
+        #   Shared = true
+        #   [runners.cache.s3]
+        #     ServerAddress = "172.17.152.121:9000"
+        #     AccessKey = "S3gitlab"
+        #     SecretKey = "S3gitlab"
+        #     BucketName = "gitlab-runner-s3-cache"
+        #     Insecure = true
