@@ -1,6 +1,5 @@
 ---
 - hosts: "{{ hosts_limit | default('all') }}"
   roles:
-    - win_prepare
-    - win_container
     - win_gitlab_runner
+              
