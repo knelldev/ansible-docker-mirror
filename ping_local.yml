@@ -4,4 +4,9 @@
   connection: local
   tasks:
     - name: Ping host for tests
-      action: ansible.builtin.ping
+      ansible.builtin.ping:
+        data: pong
+
+    - name: Print all available facts
+      ansible.builtin.debug:
+        var: ansible_facts
