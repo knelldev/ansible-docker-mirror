@@ -4,6 +4,22 @@
 # Tasks without a leading number will not be included automatically.
 ##############################################################################
 ---
+# Pre-flight: catch any __REQUIRED__ sentinel values for this role
+- name: (main.yml) Check for unconfigured mandatory variables
+  vars:
+    _missing: >-
+      {{ vars | dict2items
+       | selectattr('key', 'match', '^' + role_name + '_')
+       | selectattr('value', 'string')
+       | selectattr('value', 'search', '__REQUIRED__')
+       | map(attribute='key')
+       | list }}
+  ansible.builtin.fail:
+    msg: |
+      The following variables must be configured in your host inventory:
+      {{ _missing | join('\n') }}
+  when: _missing | length > 0
+
 # Load additional OS specific configuration from vars folder
 - name: (main.yml) Load vars for os if available
   ansible.builtin.include_vars: "{{ item }}"
@@ -15,22 +31,9 @@
         - "{{ ansible_os_family | lower }}.yml"
       skip: true
 
-# Find task files which have a leading two digit number
-- name: (main.yml) Find tasks to run
-  ansible.builtin.find:
-    paths: "{{ role_path }}/tasks"
-    use_regex: true
-    patterns:
-      - '^[0-9]{1,2}.*\.yml'
-  register: task_result
-  delegate_to: localhost
-  become: false
-
-# Include tasks in ascending number order. The filename of the task will be set as variable `task_filename`
+# Include numbered task files in ascending order (##-name.yml pattern)
 - name: (main.yml) Include tasks
-  ansible.builtin.include_tasks: "{{ main_item }}"
-  vars:
-    task_filename: "{{ main_item | replace(role_path + '/tasks/', '') }}"
-  loop: "{{ task_result.files | map(attribute='path') | flatten | sort }}"
+  ansible.builtin.include_tasks: "{{ item }}"
+  loop: "{{ q('fileglob', role_path + '/tasks/[0-9][0-9]-*.yml') | sort }}"
   loop_control:
-    loop_var: main_item
+    label: "{{ item | basename }}"

@@ -1,0 +1,48 @@
+---
+- name: "({{ task_filename }}) t-shirt runner setup"
+  when: k3s_gitlab_runner_tshirt_enabled
+  become: true
+  run_once: true
+  block:
+    - name: "({{ task_filename }}) warn if nodes differ significantly"
+      ansible.builtin.debug:
+        msg: >-
+          ⚠️  Nodes have different memory! Smallest: {{ ansible_play_hosts
+          | map('extract', hostvars, 'ansible_memtotal_mb') | min }} MB,
+          Largest: {{ ansible_play_hosts
+          | map('extract', hostvars, 'ansible_memtotal_mb') | max }} MB.
+          Sizing based on smallest node.
+      when: >-
+        (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | max | int) >
+        ((ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int) * 1.2)
+
+    - name: "({{ task_filename }}) check existing sizing state"
+      ansible.builtin.slurp:
+        src: /data/gitlab-runner/sizing.json
+      register: k3s_gitlab_runner_existing_sizing
+      failed_when: false
+
+    - name: "({{ task_filename }}) determine if sizing changed"
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_sizing_changed: >-
+          {{ k3s_gitlab_runner_existing_sizing.content is not defined
+             or (k3s_gitlab_runner_existing_sizing.content | b64decode | from_json).node_memory_mb
+                != (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int) }}
+
+    - name: "({{ task_filename }}) display sizing status"
+      ansible.builtin.debug:
+        msg: "Sizing changed: {{ k3s_gitlab_runner_sizing_changed }} | Node memory: {{ ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min }} MB"
+
+    - name: "({{ task_filename }}) apply PriorityClass for large runners"
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+        definition: "{{ lookup('template', 'priority-class.yml.j2') | from_yaml }}"
+
+    - name: "({{ task_filename }}) save sizing state"
+      ansible.builtin.copy:
+        content: |
+          {{ {'node_memory_mb': (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int)} | to_nice_json }}
+        dest: /data/gitlab-runner/sizing.json
+        mode: "0644"
+      when: k3s_gitlab_runner_sizing_changed | bool

@@ -2,7 +2,7 @@
 # Default Values for Role - Might contain placeholders for passwords - NOT live
 ###############################################################################
 ---
-# Setting sof other roles
+# Settings from other roles
 # Gitlab settings
 con_gitlab_external_url: "http://example.com/" # noqa var-naming[no-role-prefix]
 k3s_gitlab_runner_gitlab_external_url: "{{ con_gitlab_external_url }}"
@@ -13,187 +13,82 @@ k3s_gitlab_runner_namespace: "gitlab-runner"
 k3s_gitlab_runner_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 
 # Runner settings
-# Needs to be get from UI
-# k3s_gitlab_runner_token: token # used as default, only use if you have one runner
 k3s_gitlab_runner_concurrent: 50
+k3s_gitlab_runner_poll_timeout: 600
 
-k3s_gitlab_runner_config_list:
-  - name: simple
-    token: token
-    config: |
-      [[runners]]
-        [runners.kubernetes]
-          image = "python:3"
-          pull_policy = "always"
-          allowed_pull_policies = ["always", "if-not-present", "never"]
-          # [runners.cache]
-          #   Type = "s3"
-          #   Shared = true
-          #   [runners.cache.s3]
-          #     ServerAddress = "172.17.152.121:9000"
-          #     AccessKey = "S3gitlab"
-          #     SecretKey = "S3gitlab"
-          #     BucketName = "gitlab-runner-s3-cache"
-          #     Insecure = true
-  # - name: k8s-runner-xs
-  #   tags: docker-xs, k8s-xs, shared-xs
-  #   token: glrt-
-  #   config: |
-  #     # -----------------------------------------------------------------
-  #     # Extra Small (xs) Runner
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-xs"
-  #       limit = 32 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "500m"
-  #         memory_request = "500Mi"
-  #         memory_limit = "1Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
-  # - name: k8s-runner-s
-  #   tags: docker, k8s, shared, docker-s, k8s-s, shared-s
-  #   token: glrt-
-  #   config: |
-  #     # -----------------------------------------------------------------
-  #     # Small (s) Runner - DEFAULT
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-s-default"
-  #       limit = 16 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "1"
-  #         memory_request = "1Gi"
-  #         memory_limit = "2Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
-  # - name: k8s-runner-m
-  #   tags: docker-m, k8s-m, shared-m
-  #   token: glrt-
-  #   config: |
-  #     # -----------------------------------------------------------------
-  #     # Medium (m) Runner
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-m"
-  #       limit = 8 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "2"
-  #         memory_request = "2Gi"
-  #         memory_limit = "4Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
-  # - name: k8s-runner-l
-  #   tags: docker-l, k8s-l, shared-l
-  #   token: glrt
-  #   config: |
-  #     # -----------------------------------------------------------------
-  #     # Large (l) Runner
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-l"
-  #       limit = 4 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "4"
-  #         memory_request = "4Gi"
-  #         memory_limit = "8Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
-  # - name: k8s-runner-xl
-  #   tags: docker-xl, k8s-xl, shared-xl
-  #   token: glrt-
-  #   config: |
-  #     # -----------------------------------------------------------------
-  #     # Extra Large (xl) Runner
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-xl"
-  #       limit = 2 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "8"
-  #         memory_request = "8Gi"
-  #         memory_limit = "16Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
-  # - name: k8s-runner-xxl
-  #   tags: docker-xxl, k8s-xxl, shared-xxl
-  #   token: glrt-
-  #   config: |
-  #     # # -----------------------------------------------------------------
-  #     # XXL Runner
-  #     # -----------------------------------------------------------------
-  #     [[runners]]
-  #       name = "k8s-runner-xxl"
-  #       limit = 1 # 🎯 Max concurrent jobs for this size
-  #       executor = "kubernetes"
-  #       [runners.kubernetes]
-  #         image = "python:3"
-  #         pull_policy = "always"
-  #         allowed_pull_policies = ["always", "if-not-present", "never"]
-  #         cpu_request = "16"
-  #         memory_request = "16Gi"
-  #         memory_limit = "32Gi"
-  #         # [runners.cache]
-  #         #   Type = "s3"
-  #         #   Shared = true
-  #         #   [runners.cache.s3]
-  #         #     ServerAddress = "YOUR_S3_SERVER_ADDRESS"
-  #         #     AccessKey = "YOUR_S3_ACCESS_KEY"
-  #         #     SecretKey = "YOUR_S3_SECRET_KEY"
-  #         #     BucketName = "gitlab-runner-s3-cache"
-  #         #     Insecure = true
+# Hook scripts (pre/post build resource monitoring)
+# Set to false to disable hook scripts and hostpath volume mount
+k3s_gitlab_runner_hooks_enabled: true
+
+###############################################################################
+# T-Shirt sized runners (auto-registered via GitLab API)
+###############################################################################
+# Requires: k3s_gitlab_runner_admin_token (GitLab admin API token, from vault)
+# Requires: GitLab >= 17.0
+# Sizes and limits are calculated automatically based on cluster resources.
+# Size definitions are in vars/main.yml (not user-changeable).
+k3s_gitlab_runner_tshirt_enabled: true
+# k3s_gitlab_runner_admin_token: ""  # Required when tshirt_enabled or custom runners without token
+
+# Resource calculation settings
+k3s_gitlab_runner_system_reserved_mb: 2048  # Memory reserved for system/k3s
+k3s_gitlab_runner_small_pool_pct: 50        # % of usable memory for xs/s/m (rest for l/xl/xxl)
+
+# Optional: drain runners before update (wait for active jobs to finish)
+k3s_gitlab_runner_drain_before_update: false
+
+###############################################################################
+# Custom runners
+###############################################################################
+# If token is omitted, the admin token is used to auto-register the runner.
+# Each item supports:
+#   name:          (required) Helm release name and runner name
+#   token:         (optional) Runner token. If omitted, auto-registered via admin API
+#   gitlab_url:    (optional) Override GitLab URL (default: k3s_gitlab_runner_gitlab_external_url)
+#   concurrent:    (optional) Override max concurrent jobs (default: k3s_gitlab_runner_concurrent)
+#   image:         (optional) Default container image (default: python:3)
+#   poll_timeout:  (optional) Override poll timeout (default: k3s_gitlab_runner_poll_timeout)
+#   cache:         (optional) S3 cache configuration
+#     server:      S3 endpoint (e.g. "minio.example.com:9000")
+#     access_key:  S3 access key
+#     secret_key:  S3 secret key
+#     bucket:      Bucket name (e.g. "gitlab-runner-cache")
+#     insecure:    (optional) Use HTTP instead of HTTPS (default: true)
+#   extra_config:  (optional) Additional TOML config appended at [[runners]] level
+#                  Use this for cpu/memory limits, node selectors, tolerations, etc.
+#   runner_type:   (optional) "instance_type" (default), "group_type", or "project_type"
+#   group_id:      (optional) GitLab group ID (required when runner_type is "group_type")
+#   project_id:    (optional) GitLab project ID (required when runner_type is "project_type")
+#   tags:          (optional) Comma-separated tags for the runner
+#   description:   (optional) Runner description shown in GitLab UI
+k3s_gitlab_runner_config_list: []
+# Example: Runner with manual token
+# - name: my-runner
+#   token: glrt-xxxxxxxxxxxx
+#   image: python:3
+#   concurrent: 10
+#   cache:
+#     server: "minio.example.com:9000"
+#     access_key: "ACCESS_KEY"
+#     secret_key: "SECRET_KEY"
+#     bucket: "gitlab-runner-cache"
+#     insecure: true
+#   extra_config: |
+#     [runners.kubernetes]
+#       cpu_request = "2"
+#       memory_request = "2Gi"
+#       memory_limit = "4Gi"
+#       node_selector_overwrite_allowed = ".*"
+#     [runners.kubernetes.node_selector]
+#       "kubernetes.io/os" = "linux"
+#
+# Example: Auto-registered instance runner (uses admin token)
+# - name: auto-runner
+#   description: "Auto-registered shared runner"
+#   tags: "docker,k8s,shared"
+#
+# Example: Group-scoped runner
+# - name: group-runner
+#   runner_type: group_type
+#   group_id: 42
+#   tags: "group-ci"

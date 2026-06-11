@@ -1,6 +1,9 @@
 # ansible
 *.retry
 
+# macos
+.DS_store
+
 # vscode
 .vscode/*
 !.vscode/settings.json
@@ -9,8 +12,17 @@
 !.vscode/launch.json
 
 # logs
-logs/*
-!logs/.gitkeep
+logs/
+*.log
+
+# python
+__pycache__/
+.pytest_cache/
+*.egg-info/
 
 # development stuff
 _tmp/
+.ruff_cache/
+.mypy_cache/
+.coverage
+

@@ -2,6 +2,7 @@
 - name: "({{ task_filename }}) block for become=true"
   when: k3s_gitlab_runner_namespace_create
   become: true
+  run_once: true
   block:
     - name: "({{ task_filename }}) ensure pip"
       ansible.builtin.package:
@@ -11,6 +12,12 @@
     - name: "({{ task_filename }}) install needed pip packages"
       ansible.builtin.pip:
         name: "{{ os_k3s_pip_packages }}"
+
+    - name: "({{ task_filename }}) ensure data directory"
+      ansible.builtin.file:
+        path: /data/gitlab-runner
+        state: directory
+        mode: "0755"
 
     - name: Create a k8s namespace
       ansible.builtin.k8s:

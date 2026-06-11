@@ -1,6 +1,8 @@
 server {
   listen              443 ssl;
   server_name         {{ item.url }};
+  resolver 127.0.0.11 valid=5s;
+
   ssl_certificate     /etc/nginx/ssl/live/{{ item.cert_url }}/fullchain.pem;
   ssl_certificate_key /etc/nginx/ssl/live/{{ item.cert_url }}/privkey.pem;
   ssl_protocols TLSv1.2 TLSv1.3;
@@ -42,6 +44,7 @@ server {
   server_tokens off;
 
   location {{ item.proxy_location }} {
+    # set $backend_service "{{ item.proxy_url | replace('http://', '') | replace('https://', '') | trim('/') }}";
     proxy_pass {{ item.proxy_url }};  # Replace with your reverse proxy domain
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;

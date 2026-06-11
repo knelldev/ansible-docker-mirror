@@ -1,0 +1,107 @@
+#!/bin/sh
+# GitLab Runner Pre-Build Hook
+# Deployed by Ansible - do not edit manually
+# POSIX-compatible (works on alpine, debian, redhat, etc.)
+
+MONITOR_DIR="/tmp/runner_monitor_$$"
+mkdir -p "$MONITOR_DIR"
+
+# Save start time
+date +%s > "$MONITOR_DIR/start_time"
+
+# --- Detect runner size from CI variables ---
+RUNNER_SIZE="custom"
+if [ -n "$CI_RUNNER_TAGS" ]; then
+  for tag in $CI_RUNNER_TAGS; do
+    size=$(echo "$tag" | sed -n 's/^k8s-\(xs\|s\|m\|l\|xl\|xxl\)$/\1/p')
+    if [ -n "$size" ]; then
+      RUNNER_SIZE="$size"
+      break
+    fi
+  done
+fi
+echo "$RUNNER_SIZE" > "$MONITOR_DIR/runner_size"
+
+# --- Read actual memory limit from cgroup ---
+MEMORY_LIMIT_BYTES=0
+if [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  MEMORY_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
+elif [ -f /sys/fs/cgroup/memory.max ]; then
+  val=$(cat /sys/fs/cgroup/memory.max)
+  if [ "$val" != "max" ]; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+fi
+
+if [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
+  MEMORY_LIMIT_MB=$((MEMORY_LIMIT_BYTES / 1024 / 1024))
+  if [ "$MEMORY_LIMIT_MB" -ge 1024 ]; then
+    MEMORY_LIMIT_HUMAN="$((MEMORY_LIMIT_MB / 1024)) GB"
+  else
+    MEMORY_LIMIT_HUMAN="${MEMORY_LIMIT_MB} MB"
+  fi
+else
+  MEMORY_LIMIT_HUMAN="unlimited"
+fi
+
+# --- Read CPU quota ---
+CPU_INFO="unknown"
+if [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
+  quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
+  period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+  if [ "$quota" -gt 0 ] 2>/dev/null; then
+    CPU_INFO="$((quota / period)) cores (limited)"
+  else
+    CPU_INFO="no limit (request-only)"
+  fi
+elif [ -f /sys/fs/cgroup/cpu.max ]; then
+  max_line=$(cat /sys/fs/cgroup/cpu.max)
+  quota=$(echo "$max_line" | awk '{print $1}')
+  period=$(echo "$max_line" | awk '{print $2}')
+  if [ "$quota" != "max" ] && [ "$quota" -gt 0 ] 2>/dev/null; then
+    CPU_INFO="$((quota / period)) cores (limited)"
+  else
+    CPU_INFO="no limit (request-only)"
+  fi
+fi
+
+# --- Print runner info ---
+echo "════════════════════════════════════════════════════════"
+echo "👕 Runner T-Shirt Size: ${RUNNER_SIZE}"
+echo "📈 Memory Limit:        ${MEMORY_LIMIT_HUMAN}"
+echo "🖥️  CPU:                 ${CPU_INFO}"
+if [ -n "$CI_RUNNER_DESCRIPTION" ]; then
+  echo "📋 Description:         ${CI_RUNNER_DESCRIPTION}"
+fi
+echo "════════════════════════════════════════════════════════"
+
+# --- Start memory + CPU monitor in background ---
+nohup sh -c "
+while true; do
+  # Memory
+  if [ -f /sys/fs/cgroup/memory/memory.usage_in_bytes ]; then
+    cat /sys/fs/cgroup/memory/memory.usage_in_bytes
+  elif [ -f /sys/fs/cgroup/memory.current ]; then
+    cat /sys/fs/cgroup/memory.current
+  else
+    echo 0
+  fi >> $MONITOR_DIR/memory.log
+
+  # CPU usage (nanoseconds)
+  if [ -f /sys/fs/cgroup/cpu/cpuacct.usage ]; then
+    cat /sys/fs/cgroup/cpu/cpuacct.usage
+  elif [ -f /sys/fs/cgroup/cpu.stat ]; then
+    awk '/^usage_usec/ {print \$2 * 1000}' /sys/fs/cgroup/cpu.stat
+  else
+    echo 0
+  fi >> $MONITOR_DIR/cpu.log
+
+  sleep 5
+done
+" > /dev/null 2>&1 &
+
+echo $! > "$MONITOR_DIR/monitor_pid"
+
+# Store monitor dir path for post-build
+echo "$MONITOR_DIR" > /tmp/runner_monitor_dir
+echo "📊 Resource monitor started (dir: $MONITOR_DIR)"

@@ -1,12 +1,44 @@
 ---
-gitlabUrl: {{ k3s_gitlab_runner_gitlab_external_url }}
+gitlabUrl: {{ item.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
 runnerToken: {{ item.token | default(k3s_gitlab_runner_token) }}
 
 rbac:
   create: true
 
-concurrent: {{ k3s_gitlab_runner_concurrent }}
+concurrent: {{ item.concurrent | default(k3s_gitlab_runner_concurrent) }}
 
 runners:
   config: |
-    {{ item.config | indent(4) }}
+    [[runners]]
+      name = "{{ item.name }}"
+      executor = "kubernetes"
+{% if k3s_gitlab_runner_hooks_enabled | default(true) %}
+      pre_build_script = "/opt/gitlab-runner/scripts/pre-build.sh"
+      post_build_script = "/opt/gitlab-runner/scripts/post-build.sh"
+{% endif %}
+      [runners.kubernetes]
+        image = "{{ item.image | default('python:3') }}"
+        poll_timeout = {{ item.poll_timeout | default(k3s_gitlab_runner_poll_timeout) }}
+        pull_policy = "always"
+        allowed_pull_policies = ["always", "if-not-present", "never"]
+{% if k3s_gitlab_runner_hooks_enabled | default(true) %}
+        [[runners.kubernetes.volumes.host_path]]
+          name = "runner-scripts"
+          mount_path = "/opt/gitlab-runner/scripts"
+          host_path = "/data/gitlab-runner/scripts"
+          read_only = true
+{% endif %}
+{% if item.cache is defined %}
+        [runners.cache]
+          Type = "s3"
+          Shared = true
+          [runners.cache.s3]
+            ServerAddress = "{{ item.cache.server }}"
+            AccessKey = "{{ item.cache.access_key }}"
+            SecretKey = "{{ item.cache.secret_key }}"
+            BucketName = "{{ item.cache.bucket }}"
+            Insecure = {{ item.cache.insecure | default(true) | lower }}
+{% endif %}
+{% if item.extra_config is defined %}
+    {{ item.extra_config | indent(4) }}
+{% endif %}

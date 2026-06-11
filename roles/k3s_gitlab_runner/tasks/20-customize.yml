@@ -1,0 +1,21 @@
+---
+- name: "({{ task_filename }}) customize block"
+  become: true
+  block:
+    - name: "({{ task_filename }}) ensure scripts directory exists"
+      ansible.builtin.file:
+        path: /data/gitlab-runner/scripts
+        state: directory
+        mode: "0755"
+
+    - name: "({{ task_filename }}) deploy pre-build hook script"
+      ansible.builtin.template:
+        src: pre-build.sh.j2
+        dest: /data/gitlab-runner/scripts/pre-build.sh
+        mode: "0755"
+
+    - name: "({{ task_filename }}) deploy post-build hook script"
+      ansible.builtin.template:
+        src: post-build.sh.j2
+        dest: /data/gitlab-runner/scripts/post-build.sh
+        mode: "0755"

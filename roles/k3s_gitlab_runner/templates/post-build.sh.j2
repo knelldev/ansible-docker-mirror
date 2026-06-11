@@ -1,0 +1,175 @@
+#!/bin/sh
+# GitLab Runner Post-Build Hook
+# Deployed by Ansible - do not edit manually
+# POSIX-compatible (works on alpine, debian, redhat, etc.)
+
+# --- Locate monitor directory ---
+MONITOR_DIR=""
+if [ -f /tmp/runner_monitor_dir ]; then
+  MONITOR_DIR=$(cat /tmp/runner_monitor_dir)
+fi
+
+# Fallback: find most recent monitor dir
+if [ -z "$MONITOR_DIR" ] || [ ! -d "$MONITOR_DIR" ]; then
+  MONITOR_DIR=$(ls -dt /tmp/runner_monitor_* 2>/dev/null | head -1)
+fi
+
+if [ -z "$MONITOR_DIR" ] || [ ! -d "$MONITOR_DIR" ]; then
+  echo "📊 Resource monitor: no data collected"
+  exit 0
+fi
+
+# --- Stop monitor ---
+if [ -f "$MONITOR_DIR/monitor_pid" ]; then
+  kill "$(cat "$MONITOR_DIR/monitor_pid")" 2>/dev/null
+fi
+
+# --- Calculate runtime ---
+END_TIME=$(date +%s)
+START_TIME=0
+if [ -f "$MONITOR_DIR/start_time" ]; then
+  START_TIME=$(cat "$MONITOR_DIR/start_time")
+fi
+DURATION=$((END_TIME - START_TIME))
+DURATION_MIN=$((DURATION / 60))
+DURATION_SEC=$((DURATION % 60))
+
+# --- Read runner size ---
+RUNNER_SIZE="custom"
+if [ -f "$MONITOR_DIR/runner_size" ]; then
+  RUNNER_SIZE=$(cat "$MONITOR_DIR/runner_size")
+fi
+
+# --- Memory stats ---
+MAX_MEM_BYTES=0
+TOTAL_MEM_BYTES=0
+MEM_COUNT=0
+
+if [ -f "$MONITOR_DIR/memory.log" ]; then
+  while read -r line; do
+    case "$line" in ''|*[!0-9]*) continue ;; esac
+    if [ "$line" -eq 0 ] 2>/dev/null; then continue; fi
+    MEM_COUNT=$((MEM_COUNT + 1))
+    TOTAL_MEM_BYTES=$((TOTAL_MEM_BYTES + line))
+    if [ "$line" -gt "$MAX_MEM_BYTES" ]; then
+      MAX_MEM_BYTES=$line
+    fi
+  done < "$MONITOR_DIR/memory.log"
+fi
+
+AVG_MEM_MB=0
+MAX_MEM_MB=0
+if [ "$MEM_COUNT" -gt 0 ]; then
+  AVG_MEM_MB=$((TOTAL_MEM_BYTES / MEM_COUNT / 1024 / 1024))
+  MAX_MEM_MB=$((MAX_MEM_BYTES / 1024 / 1024))
+fi
+
+# --- CPU stats ---
+CPU_START_NS=0
+CPU_END_NS=0
+if [ -f "$MONITOR_DIR/cpu.log" ]; then
+  CPU_START_NS=$(head -1 "$MONITOR_DIR/cpu.log" 2>/dev/null || echo 0)
+  CPU_END_NS=$(tail -1 "$MONITOR_DIR/cpu.log" 2>/dev/null || echo 0)
+fi
+
+# Sanitize
+case "$CPU_START_NS" in ''|*[!0-9]*) CPU_START_NS=0 ;; esac
+case "$CPU_END_NS" in ''|*[!0-9]*) CPU_END_NS=0 ;; esac
+
+CPU_USED_NS=$((CPU_END_NS - CPU_START_NS))
+CPU_USED_SEC=0
+CPU_AVG_CORES="N/A"
+if [ "$CPU_USED_NS" -gt 0 ] && [ "$DURATION" -gt 0 ]; then
+  CPU_USED_SEC=$((CPU_USED_NS / 1000000000))
+  # Average cores = cpu_time / wall_time
+  CPU_AVG_CORES_X100=$((CPU_USED_NS * 100 / (DURATION * 1000000000)))
+  CPU_AVG_WHOLE=$((CPU_AVG_CORES_X100 / 100))
+  CPU_AVG_FRAC=$((CPU_AVG_CORES_X100 % 100))
+  CPU_AVG_CORES="${CPU_AVG_WHOLE}.$(printf '%02d' $CPU_AVG_FRAC)"
+fi
+
+# --- Memory limit for percentage ---
+MEMORY_LIMIT_BYTES=0
+if [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  MEMORY_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
+elif [ -f /sys/fs/cgroup/memory.max ]; then
+  val=$(cat /sys/fs/cgroup/memory.max)
+  if [ "$val" != "max" ]; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+fi
+
+# --- Print report ---
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo "📊 Job Resource Report"
+echo "────────────────────────────────────────────────────────"
+echo "   ⏱️  Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
+echo "   👕 Runner Size:    ${RUNNER_SIZE}"
+echo "────────────────────────────────────────────────────────"
+echo "   📈 Memory Average: ${AVG_MEM_MB} MB"
+echo "   📈 Memory Peak:    ${MAX_MEM_MB} MB"
+echo "   📈 Samples:        ${MEM_COUNT}"
+
+if [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
+  LIMIT_MB=$((MEMORY_LIMIT_BYTES / 1024 / 1024))
+  if [ "$MAX_MEM_MB" -gt 0 ]; then
+    MEM_PCT=$((MAX_MEM_MB * 100 / LIMIT_MB))
+  else
+    MEM_PCT=0
+  fi
+  echo "   📈 Memory Limit:   ${LIMIT_MB} MB"
+  echo "   📈 Peak Usage:     ${MEM_PCT}%"
+fi
+
+echo "────────────────────────────────────────────────────────"
+echo "   🖥️  CPU Time:       ${CPU_USED_SEC}s"
+echo "   🖥️  Avg CPU Cores:  ${CPU_AVG_CORES}"
+echo "────────────────────────────────────────────────────────"
+
+# --- Size recommendation (t-shirt sizes only) ---
+if [ "$RUNNER_SIZE" != "custom" ] && [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null && [ "$MAX_MEM_MB" -gt 0 ]; then
+  if [ "$MEM_PCT" -ge 80 ]; then
+    case "$RUNNER_SIZE" in
+      xs)  NEXT="s" ;;
+      s)   NEXT="m" ;;
+      m)   NEXT="l" ;;
+      l)   NEXT="xl" ;;
+      xl)  NEXT="xxl" ;;
+      xxl) NEXT="" ;;
+    esac
+    if [ -n "$NEXT" ]; then
+      echo "   ⚠️  Peak memory at ${MEM_PCT}% of limit!"
+      echo "   💡 Recommendation: upgrade to k8s-${NEXT}"
+    else
+      echo "   ⚠️  Peak memory at ${MEM_PCT}% of limit (already max size)"
+    fi
+  elif [ "$MEM_PCT" -lt 40 ]; then
+    case "$RUNNER_SIZE" in
+      xs)  PREV="" ;;
+      s)   PREV="xs" ;;
+      m)   PREV="s" ;;
+      l)   PREV="m" ;;
+      xl)  PREV="l" ;;
+      xxl) PREV="xl" ;;
+    esac
+    if [ -n "$PREV" ]; then
+      echo "   💚 Peak memory only ${MEM_PCT}% of limit"
+      echo "   💡 Recommendation: consider downgrading to k8s-${PREV}"
+    else
+      echo "   💚 Memory usage is efficient (${MEM_PCT}%)"
+    fi
+  else
+    echo "   ✅ Memory usage is appropriate (${MEM_PCT}%)"
+  fi
+else
+  if [ "$RUNNER_SIZE" = "custom" ]; then
+    echo "   ℹ️  Custom runner — no size recommendation"
+  fi
+fi
+
+echo "════════════════════════════════════════════════════════"
+
+# Cleanup
+rm -rf "$MONITOR_DIR"
+rm -f /tmp/runner_monitor_dir

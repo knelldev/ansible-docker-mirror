@@ -1,50 +1,39 @@
 ##############################################################################
-# Standard Role Entrypoint (main.yml)
-#
-# This file serves as a standardized entrypoint for our Ansible roles.
-# Its purpose is to provide a consistent, ordered execution flow without
-# needing to modify this file for each role.
-#
-# --- How It Works ---
-#
-# 1. OS-Specific Variables:
-#    It first attempts to load variables from the `vars/` directory based on
-#    the target operating system, allowing for OS-specific overrides.
-#
-# 2. Automatic Task Inclusion:
-#    It automatically finds and includes task files from the `tasks/`
-#    directory that are prefixed with two digits (e.g., `10-install.yml`,
-#    `20-configure.yml`). These files are executed in ascending order.
-#
-# 3. Manual Task Inclusion:
-#    Task files that do NOT start with a two-digit prefix (e.g., `_helpers.yml`)
-#    are ignored by the automatic loop. This is useful for files that you
-#    want to include manually inside another task, for example, within a
-#    `block` or a `loop`.
-#
-# 4. Logging:
-#    The filename of each included task is passed as the `task_filename`
-#    variable, which can be used in task names for clearer logging output.
-#    Example: `name: "({{ task_filename }}) Install packages"`
-#
+# General main for our roles.
+# Does not need any changes and will use an ascending number order for the tasks.
+# Tasks without a leading number will not be included automatically.
 ##############################################################################
 ---
-# Load variables for the target OS, if a matching file exists.
-- name: (main.yml) Load OS-specific variables
+# Pre-flight: catch any __REQUIRED__ sentinel values for this role
+- name: (main.yml) Check for unconfigured mandatory variables
+  vars:
+    _missing: >-
+      {{ vars | dict2items
+       | selectattr('key', 'match', '^' + role_name + '_')
+       | selectattr('value', 'string')
+       | selectattr('value', 'search', '__REQUIRED__')
+       | map(attribute='key')
+       | list }}
+  ansible.builtin.fail:
+    msg: |
+      The following variables must be configured in your host inventory:
+      {{ _missing | join('\n') }}
+  when: _missing | length > 0
+
+# Load additional OS specific configuration from vars folder
+- name: (main.yml) Load vars for os if available
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml" # e.g., ubuntu-22.04.yml
-        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version | lower }}.yml" # e.g., ubuntu-22.yml
-        - "{{ ansible_distribution | lower }}.yml" # e.g., ubuntu.yml
-        - "{{ ansible_os_family | lower }}.yml" # e.g., debian.yml
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
       skip: true
 
-# Include all task files prefixed with two digits in ascending order.
-- name: (main.yml) Include ordered tasks
-  ansible.builtin.include_tasks: "{{ task_file }}"
-  loop: "{{ query('fileglob', 'tasks/[0-9][0-9]*.yml') | sort }}"
+# Include numbered task files in ascending order (##-name.yml pattern)
+- name: (main.yml) Include tasks
+  ansible.builtin.include_tasks: "{{ item }}"
+  loop: "{{ q('fileglob', role_path + '/tasks/[0-9][0-9]-*.yml') | sort }}"
   loop_control:
-    loop_var: task_file
-  vars:
-    task_filename: "{{ task_file | basename }}"
+    label: "{{ item | basename }}"

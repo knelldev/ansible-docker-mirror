@@ -1,0 +1,9 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: runner-priority-high
+value: 1000
+preemptionPolicy: Never
+globalDefault: false
+description: "Priority class for large t-shirt runners (l/xl/xxl). Does not preempt."

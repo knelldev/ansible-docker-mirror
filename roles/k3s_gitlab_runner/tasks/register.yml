@@ -1,0 +1,79 @@
+---
+# Included per t-shirt size from 10-install.yml
+# tshirt_item is the loop var: {key: 'xs', value: {memory_limit: '512Mi', ...}}
+
+- name: "(register) check GitLab version"
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/version"
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_runner_gitlab_version_result
+  run_once: true
+  when: k3s_gitlab_runner_gitlab_version_result is not defined
+
+- name: "(register) fail if GitLab < 17.0"
+  ansible.builtin.fail:
+    msg: >-
+      GitLab version {{ k3s_gitlab_runner_gitlab_version_result.json.version }} is below
+      {{ k3s_gitlab_runner_min_gitlab_version }}. Runner auto-registration requires >= 17.0.
+  when:
+    - k3s_gitlab_runner_gitlab_version_result.json.version is version(k3s_gitlab_runner_min_gitlab_version, '<')
+
+- name: "(register) check if runner k8s-runner-{{ tshirt_item.key }} exists"
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/runners/all?type=instance_type&search=k8s-runner-{{ tshirt_item.key }}"
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_runner_existing
+
+- name: "(register) create runner k8s-runner-{{ tshirt_item.key }}"
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/user/runners"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+    body_format: json
+    body:
+      runner_type: instance_type
+      description: "k8s-runner-{{ tshirt_item.key }} | cpu={{ tshirt_item.value.cpu_request }} mem={{ tshirt_item.value.memory_limit }}"
+      tag_list:
+        - "docker-{{ tshirt_item.key }}"
+        - "k8s-{{ tshirt_item.key }}"
+        - "shared-{{ tshirt_item.key }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: 201
+  register: k3s_gitlab_runner_created
+  when: k3s_gitlab_runner_existing.json | selectattr('description', 'search', 'k8s-runner-' + tshirt_item.key) | list | length == 0
+
+- name: "(register) rotate token for existing runner k8s-runner-{{ tshirt_item.key }}"
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/runners/{{ (k3s_gitlab_runner_existing.json | selectattr('description', 'search', 'k8s-runner-' + tshirt_item.key) | first).id }}/reset_authentication_token"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: 200
+  register: k3s_gitlab_runner_rotated
+  when:
+    - k3s_gitlab_runner_existing.json | selectattr('description', 'search', 'k8s-runner-' + tshirt_item.key) | list | length > 0
+    - k3s_gitlab_runner_sizing_changed | default(true) | bool
+
+- name: "(register) set runner token fact"
+  ansible.builtin.set_fact:
+    k3s_gitlab_runner_current_token: >-
+      {{ k3s_gitlab_runner_created.json.token | default(
+         k3s_gitlab_runner_rotated.json.token | default('')) }}
+
+- name: "(register) deploy helm chart for k8s-runner-{{ tshirt_item.key }}"
+  kubernetes.core.helm:
+    name: "k8s-runner-{{ tshirt_item.key }}"
+    chart_ref: gitlab/gitlab-runner
+    namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
+    update_repo_cache: true
+    values: "{{ lookup('template', 'values-tshirt.yaml.j2') | from_yaml }}"
+    kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+    binary_path: /usr/local/bin/helm
+    validate_certs: "{{ http.ssl_verify }}"
+  when: k3s_gitlab_runner_current_token | length > 0
