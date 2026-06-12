@@ -1,5 +1,5 @@
 ---
-- name: "({{ task_filename }}) k3s server block"
+- name: "k3s server block"
   become: true
   run_once: true
   block:
@@ -10,7 +10,7 @@
         binary_path: /usr/local/bin/helm
 
     # --- T-Shirt runners ---
-    - name: "({{ task_filename }}) register and deploy t-shirt runners"
+    - name: "register and deploy t-shirt runners"
       ansible.builtin.include_tasks: register.yml
       loop: "{{ k3s_gitlab_runner_tshirt_sizes | dict2items }}"
       loop_control:
@@ -20,7 +20,7 @@
         - (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int) >= (tshirt_item.value.min_node_mb | int) or (tshirt_item.value.min_node_mb | int) == 0
 
     # --- Custom runners ---
-    - name: "({{ task_filename }}) deploy custom runners"
+    - name: "deploy custom runners"
       kubernetes.core.helm:
         name: "{{ item.name }}"
         chart_ref: gitlab/gitlab-runner

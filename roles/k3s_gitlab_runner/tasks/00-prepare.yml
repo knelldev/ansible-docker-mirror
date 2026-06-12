@@ -1,19 +1,19 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: "block for become=true"
   when: k3s_gitlab_runner_namespace_create
   become: true
   run_once: true
   block:
-    - name: "({{ task_filename }}) ensure pip"
+    - name: "ensure pip"
       ansible.builtin.package:
         name: python3-pip
         state: present
 
-    - name: "({{ task_filename }}) install needed pip packages"
+    - name: "install needed pip packages"
       ansible.builtin.pip:
         name: "{{ os_k3s_pip_packages }}"
 
-    - name: "({{ task_filename }}) ensure data directory"
+    - name: "ensure data directory"
       ansible.builtin.file:
         path: /data/gitlab-runner
         state: directory
