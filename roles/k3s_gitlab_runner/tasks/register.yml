@@ -22,7 +22,7 @@
 
 - name: "(register) check if runner k8s-runner-{{ tshirt_item.key }} exists"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/runners/all?type=instance_type&search=k8s-runner-{{ tshirt_item.key }}"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/all?type=instance_type&search=k8s-runner-{{ tshirt_item.key }}"
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
     validate_certs: "{{ http.ssl_verify }}"
@@ -30,7 +30,7 @@
 
 - name: "(register) create runner k8s-runner-{{ tshirt_item.key }}"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/user/runners"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners"
     method: POST
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
