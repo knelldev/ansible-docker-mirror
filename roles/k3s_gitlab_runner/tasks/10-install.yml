@@ -3,6 +3,24 @@
   become: true
   run_once: true
   block:
+    - name: "(register) check GitLab version"
+      ansible.builtin.uri:
+        url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/version"
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_runner_gitlab_version_result
+      run_once: true
+      when: k3s_gitlab_runner_admin_token is defined
+
+    - name: "(register) fail if GitLab < 17.0"
+      ansible.builtin.fail:
+        msg: >-
+          GitLab version {{ k3s_gitlab_runner_gitlab_version_result.json.version }} is below
+          {{ k3s_gitlab_runner_min_gitlab_version }}. Runner auto-registration requires >= 17.0.
+      when:
+        - k3s_gitlab_runner_gitlab_version_result.json.version is version(k3s_gitlab_runner_min_gitlab_version, '<')
+
     - name: Add stable gitlab chart repo
       kubernetes.core.helm_repository:
         name: gitlab

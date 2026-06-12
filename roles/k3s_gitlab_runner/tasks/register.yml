@@ -2,24 +2,6 @@
 # Included per t-shirt size from 10-install.yml
 # tshirt_item is the loop var: {key: 'xs', value: {memory_limit: '512Mi', ...}}
 
-- name: "(register) check GitLab version"
-  ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/version"
-    headers:
-      PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
-    validate_certs: "{{ http.ssl_verify }}"
-  register: k3s_gitlab_runner_gitlab_version_result
-  run_once: true
-  when: k3s_gitlab_runner_gitlab_version_result is not defined
-
-- name: "(register) fail if GitLab < 17.0"
-  ansible.builtin.fail:
-    msg: >-
-      GitLab version {{ k3s_gitlab_runner_gitlab_version_result.json.version }} is below
-      {{ k3s_gitlab_runner_min_gitlab_version }}. Runner auto-registration requires >= 17.0.
-  when:
-    - k3s_gitlab_runner_gitlab_version_result.json.version is version(k3s_gitlab_runner_min_gitlab_version, '<')
-
 - name: "(register) check if runner k8s-runner-{{ tshirt_item.key }} exists"
   ansible.builtin.uri:
     url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/all?type=instance_type&search=k8s-runner-{{ tshirt_item.key }}"
