@@ -4,18 +4,18 @@
   block:
     - name: "ensure scripts directory exists"
       ansible.builtin.file:
-        path: /data/gitlab-runner/scripts
+        path: "{{ app_path }}/scripts"
         state: directory
         mode: "0755"
 
     - name: "deploy pre-build hook script"
       ansible.builtin.template:
         src: pre-build.sh.j2
-        dest: /data/gitlab-runner/scripts/pre-build.sh
+        dest: "{{ app_path }}/scripts/pre-build.sh"
         mode: "0755"
 
     - name: "deploy post-build hook script"
       ansible.builtin.template:
         src: post-build.sh.j2
-        dest: /data/gitlab-runner/scripts/post-build.sh
+        dest: "{{ app_path }}/scripts/post-build.sh"
         mode: "0755"

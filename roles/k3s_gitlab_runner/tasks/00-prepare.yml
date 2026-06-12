@@ -1,28 +1,13 @@
 ---
 - name: "block for become=true"
-  when: k3s_gitlab_runner_namespace_create
   become: true
-  run_once: true
   block:
-    - name: "ensure pip"
-      ansible.builtin.package:
-        name: python3-pip
-        state: present
-
-    - name: "install needed pip packages"
-      ansible.builtin.pip:
-        name: "{{ os_k3s_pip_packages }}"
-
-    - name: "ensure data directory"
+    - name: "Create {{ app_name }} dirs"
       ansible.builtin.file:
-        path: /data/gitlab-runner
+        path: "{{ app_path }}/{{ item.name }}"
         state: directory
-        mode: "0755"
-
-    - name: Create a k8s namespace
-      ansible.builtin.k8s:
-        name: "{{ k3s_gitlab_runner_namespace | lower }}"
-        api_version: v1
-        kind: Namespace
-        state: present
-        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('data') }}"
+        mode: "{{ item.mode | default('0755') }}"
+      loop:
+        - name: ""

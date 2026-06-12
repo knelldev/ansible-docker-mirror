@@ -18,7 +18,7 @@
 
     - name: "check existing sizing state"
       ansible.builtin.slurp:
-        src: /data/gitlab-runner/sizing.json
+        src: "{{ app_path }}/sizing.json"
       register: k3s_gitlab_runner_existing_sizing
       failed_when: false
 
@@ -43,6 +43,6 @@
       ansible.builtin.copy:
         content: |
           {{ {'node_memory_mb': (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int)} | to_nice_json }}
-        dest: /data/gitlab-runner/sizing.json
+        dest: "{{ app_path }}/sizing.json"
         mode: "0644"
       when: k3s_gitlab_runner_sizing_changed | bool

@@ -1,4 +1,7 @@
 ---
+app_name: "{{ role_name.split('_')[1] }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ storage_base_path }}/{{ app_name }}" # noqa var-naming[no-role-prefix]
+
 # T-Shirt size definitions (not user-changeable)
 # mem_request = mem_limit for guaranteed QoS
 # Tags are auto-generated as: docker-{size},k8s-{size},shared-{size}
