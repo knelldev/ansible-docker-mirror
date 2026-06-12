@@ -4,7 +4,7 @@
 
 - name: "(register) check GitLab version"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/version"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/version"
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
     validate_certs: "{{ http.ssl_verify }}"
@@ -49,7 +49,7 @@
 
 - name: "(register) rotate token for existing runner k8s-runner-{{ tshirt_item.key }}"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}api/v4/runners/{{ (k3s_gitlab_runner_existing.json | selectattr('description', 'search', 'k8s-runner-' + tshirt_item.key) | first).id }}/reset_authentication_token"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/v4/runners/{{ (k3s_gitlab_runner_existing.json | selectattr('description', 'search', 'k8s-runner-' + tshirt_item.key) | first).id }}/reset_authentication_token"
     method: POST
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
