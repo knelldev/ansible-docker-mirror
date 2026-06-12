@@ -7,10 +7,10 @@
 # Pre-flight: catch any __REQUIRED__ sentinel values for this role
 - name: (main.yml) Check for unconfigured mandatory variables
   vars:
-    _varnames: "{{ varnames('^' + role_name + '_') }}"
+    _varnames: "{{ q('ansible.builtin.varnames', '^' + role_name + '_') }}"
     _missing: >-
       {{
-        _varnames | map('extract', hostvars)
+        _varnames | map('extract', hostvars[inventory_hostname])
         | selectattr('value', 'defined')
         | selectattr('value', 'string')
         | selectattr('value', 'search', '__REQUIRED__')
