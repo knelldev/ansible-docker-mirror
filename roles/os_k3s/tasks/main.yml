@@ -7,13 +7,15 @@
 # Pre-flight: catch any __REQUIRED__ sentinel values for this role
 - name: (main.yml) Check for unconfigured mandatory variables
   vars:
+    _varnames: "{{ q('ansible.builtin.varnames', '^' + role_name + '_') }}"
     _missing: >-
-      {{ vars | dict2items
-       | selectattr('key', 'match', '^' + role_name + '_')
-       | selectattr('value', 'string')
-       | selectattr('value', 'search', '__REQUIRED__')
-       | map(attribute='key')
-       | list }}
+      {{
+        _varnames | map('extract', hostvars[inventory_hostname])
+        | selectattr('value', 'defined')
+        | selectattr('value', 'string')
+        | selectattr('value', 'search', '__REQUIRED__')
+        | list | map(attribute='key')
+      }}
   ansible.builtin.fail:
     msg: |
       The following variables must be configured in your host inventory:
