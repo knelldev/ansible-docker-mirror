@@ -11,6 +11,7 @@
     - name: "install needed pip packages"
       ansible.builtin.pip:
         name: "{{ os_k3s_pip_packages }}"
+        break_system_packages: true
 
     - name: Create a k8s namespace
       ansible.builtin.k8s:
