@@ -27,7 +27,7 @@ runners:
           name = "runner-scripts"
           mount_path = "/opt/gitlab-runner/scripts"
           host_path = "/data/{{ app_name}}/scripts"
-          mount_propagation = None
+          mount_propagation = "None"
           read_only = true
 {% endif %}
 {% if item.cache is defined %}
