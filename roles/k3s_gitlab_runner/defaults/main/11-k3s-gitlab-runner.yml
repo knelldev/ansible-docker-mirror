@@ -48,6 +48,7 @@ k3s_gitlab_runner_drain_before_update: false
 #   concurrent:    (optional) Override max concurrent jobs (default: k3s_gitlab_runner_concurrent)
 #   image:         (optional) Default container image (default: python:3)
 #   poll_timeout:  (optional) Override poll timeout (default: k3s_gitlab_runner_poll_timeout)
+#   privileged:    (optional) Run DinD jobs with privileged flag (default: false)
 #   cache:         (optional) S3 cache configuration
 #     server:      S3 endpoint (e.g. "minio.example.com:9000")
 #     access_key:  S3 access key

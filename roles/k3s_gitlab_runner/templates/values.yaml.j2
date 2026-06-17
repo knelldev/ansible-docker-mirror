@@ -21,6 +21,7 @@ runners:
         poll_timeout = {{ item.poll_timeout | default(k3s_gitlab_runner_poll_timeout) }}
         pull_policy = "always"
         allowed_pull_policies = ["always", "if-not-present", "never"]
+        privileged = {{ item.privileged | default(false) }}
 {% if k3s_gitlab_runner_hooks_enabled | default(true) %}
         [[runners.kubernetes.volumes.host_path]]
           name = "runner-scripts"
