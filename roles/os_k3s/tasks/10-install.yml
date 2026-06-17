@@ -1,29 +1,29 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: "block for become=true"
   when: os_k3s_install
   become: true
   block:
-    - name: "({{ task_filename }}) Download get-k3s.sh"
+    - name: "Download get-k3s.sh"
       ansible.builtin.get_url:
         url: https://get.k3s.io
         dest: /tmp/get-k3s.sh
         mode: "0700"
 
-    - name: "({{ task_filename }}) Install k3s Server (Controller)"
+    - name: "Install k3s Server (Controller)"
       become: true
       when: os_k3s_server
       block:
-        - name: "({{ task_filename }}) Include k3s Agent (Controller)"
+        - name: "Include k3s Agent (Controller)"
           ansible.builtin.include_tasks: k3s-server.yml
 
-    - name: "({{ task_filename }}) Install k3s Agent (Worker)"
+    - name: "Install k3s Agent (Worker)"
       become: true
       when: not os_k3s_server
       block:
-        - name: "({{ task_filename }}) Include k3s Agent (Worker)"
+        - name: "Include k3s Agent (Worker)"
           ansible.builtin.include_tasks: k3s-agent.yml
 
-    - name: "({{ task_filename }}) Remove get-k3s.sh"
+    - name: "Remove get-k3s.sh"
       ansible.builtin.file:
         path: /tmp/get-k3s.sh
         state: absent

@@ -1,5 +1,5 @@
 ---
-- name: "({{ task_filename }}) execute get-k3s.sh (agent)"
+- name: "execute get-k3s.sh (agent)"
   ansible.builtin.shell: '/tmp/get-k3s.sh {% if os_k3s_node_external_ip_override %}--node-external-ip={{ os_k3s_node_external_ip }}{% endif %} --data-dir={{ app_path }} --kubelet-arg "--root-dir={{ app_path }}/kubelet" {{ os_k3s_server_additional_parameters }}'
   environment:
     K3S_URL: "{{  hostvars['localhost']['os_k3s_url'] }}"
