@@ -32,7 +32,8 @@ runners:
         [[runners.kubernetes.volumes.host_path]]
           name = "runner-scripts"
           mount_path = "/opt/gitlab-runner/scripts"
-          host_path = "/data/{{ app_name}}/scripts"
+          host_path = "/data/{{ app_name }}/scripts"
+          mount_propagation = None
           read_only = true
 {% if tshirt_item.value.cache is defined %}
         [runners.cache]
