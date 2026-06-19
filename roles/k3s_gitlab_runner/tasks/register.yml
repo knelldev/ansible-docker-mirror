@@ -50,7 +50,7 @@
     kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
     binary_path: /usr/local/bin/helm
     validate_certs: "{{ http.ssl_verify }}"
-    force: "{{ item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) | bool }}"
+    force: "{{ item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) }}"
   when: item.token is defined or (item.key is defined and item.value is defined) or (item.runner_type is defined)
 
 - name: "(healthcheck) verify {{ item.key | default(item.name) }} is registered"
