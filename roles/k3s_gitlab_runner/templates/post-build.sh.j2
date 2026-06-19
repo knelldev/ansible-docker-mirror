@@ -90,11 +90,23 @@ fi
 
 # --- Memory limit for percentage ---
 MEMORY_LIMIT_BYTES=0
-if [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
-  MEMORY_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
-elif [ -f /sys/fs/cgroup/memory.max ]; then
-  val=$(cat /sys/fs/cgroup/memory.max)
-  if [ "$val" != "max" ]; then
+
+# Check for cgroup v2 (modern, used by Ubuntu 22.04+, Debian 11+, Fedora, Alma/Rocky 9+)
+if [ -f /sys/fs/cgroup/memory.max ]; then
+  val=$(cat /sys/fs/cgroup/memory.max 2>/dev/null)
+  if [ "$val" != "max" ] && [ -n "$val" ]; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Check for cgroup v1 (older systems, some RHEL/CentOS)
+elif [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  val=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Alpine fallback: check memory.current as limit (some Alpine configs)
+elif [ -f /sys/fs/cgroup/memory.current ]; then
+  val=$(cat /sys/fs/cgroup/memory.current 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
     MEMORY_LIMIT_BYTES=$val
   fi
 fi
@@ -104,8 +116,14 @@ echo ""
 echo "════════════════════════════════════════════════════════"
 echo "📊 Job Resource Report"
 echo "────────────────────────────────────────────────────────"
+{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
+if [ "$RUNNER_SIZE" != "custom" ]; then
+  echo "   ⏱️  Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
+  echo "   👕 Runner Size:    ${RUNNER_SIZE}"
+fi
+{% else %}
 echo "   ⏱️  Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
-echo "   👕 Runner Size:    ${RUNNER_SIZE}"
+{% endif %}
 echo "────────────────────────────────────────────────────────"
 echo "   📈 Memory Average: ${AVG_MEM_MB} MB"
 echo "   📈 Memory Peak:    ${MAX_MEM_MB} MB"
@@ -127,6 +145,7 @@ echo "   🖥️  CPU Time:       ${CPU_USED_SEC}s"
 echo "   🖥️  Avg CPU Cores:  ${CPU_AVG_CORES}"
 echo "────────────────────────────────────────────────────────"
 
+{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
 # --- Size recommendation (t-shirt sizes only) ---
 if [ "$RUNNER_SIZE" != "custom" ] && [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null && [ "$MAX_MEM_MB" -gt 0 ]; then
   if [ "$MEM_PCT" -ge 80 ]; then
@@ -167,6 +186,7 @@ else
     echo "   ℹ️  Custom runner — no size recommendation"
   fi
 fi
+{% endif %}
 
 echo "════════════════════════════════════════════════════════"
 

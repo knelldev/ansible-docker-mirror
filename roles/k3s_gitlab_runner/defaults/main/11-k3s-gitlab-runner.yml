@@ -37,6 +37,9 @@ k3s_gitlab_runner_small_pool_pct: 50        # % of usable memory for xs/s/m (res
 # Optional: drain runners before update (wait for active jobs to finish)
 k3s_gitlab_runner_drain_before_update: false
 
+# Global force_reinstall flag - can be overridden per runner
+k3s_gitlab_runner_force_reinstall: false
+
 ###############################################################################
 # Custom runners
 ###############################################################################
@@ -62,6 +65,8 @@ k3s_gitlab_runner_drain_before_update: false
 #   project_id:    (optional) GitLab project ID (required when runner_type is "project_type")
 #   tags:          (optional) Comma-separated tags for the runner
 #   description:   (optional) Runner description shown in GitLab UI
+#   skip_healthcheck: (optional) Skip the health check after deployment (default: false)
+#   force_reinstall: (optional) Force Helm chart reinstall/update (default: false)
 k3s_gitlab_runner_config_list: []
 # Example: Runner with manual token
 # - name: my-runner
@@ -93,3 +98,8 @@ k3s_gitlab_runner_config_list: []
 #   runner_type: group_type
 #   group_id: 42
 #   tags: "group-ci"
+#
+# Example: Custom runner with manual token (no admin token needed)
+# - name: custom-runner
+#   token: glrt-xxxxxxxxxxxx
+#   skip_healthcheck: true  # Skip health check if no admin token available

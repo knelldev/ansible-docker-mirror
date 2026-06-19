@@ -27,26 +27,9 @@
         repo_url: "https://charts.gitlab.io"
         binary_path: /usr/local/bin/helm
 
-    # --- T-Shirt runners ---
-    - name: "register and deploy t-shirt runners"
+    # --- All runners (t-shirt + custom) ---
+    - name: "register and deploy all runners"
       ansible.builtin.include_tasks: register.yml
-      loop: "{{ k3s_gitlab_runner_tshirt_sizes | dict2items }}"
+      loop: "{{ k3s_gitlab_runner_tshirt_sizes | dict2items | list + k3s_gitlab_runner_config_list }}"
       loop_control:
-        loop_var: tshirt_item
-      when:
-        - k3s_gitlab_runner_tshirt_enabled
-        - (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int) >= (tshirt_item.value.min_node_mb | int) or (tshirt_item.value.min_node_mb | int) == 0
-
-    # --- Custom runners ---
-    - name: "deploy custom runners"
-      kubernetes.core.helm:
-        name: "{{ item.name }}"
-        chart_ref: gitlab/gitlab-runner
-        namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
-        update_repo_cache: true
-        values: "{{ lookup('template', 'values.yaml.j2') | from_yaml }}"
-        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
-        binary_path: /usr/local/bin/helm
-        validate_certs: "{{ http.ssl_verify }}"
-      loop: "{{ k3s_gitlab_runner_config_list }}"
-      when: k3s_gitlab_runner_config_list | length > 0
+        loop_var: item

@@ -22,13 +22,32 @@ if [ -n "$CI_RUNNER_TAGS" ]; then
 fi
 echo "$RUNNER_SIZE" > "$MONITOR_DIR/runner_size"
 
+# --- Only show t-shirt size info for actual t-shirt runners ---
+{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
+if [ "$RUNNER_SIZE" != "custom" ]; then
+  echo "👕 Runner T-Shirt Size: ${RUNNER_SIZE}"
+fi
+{% endif %}
+
 # --- Read actual memory limit from cgroup ---
 MEMORY_LIMIT_BYTES=0
-if [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
-  MEMORY_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
-elif [ -f /sys/fs/cgroup/memory.max ]; then
-  val=$(cat /sys/fs/cgroup/memory.max)
-  if [ "$val" != "max" ]; then
+
+# Check for cgroup v2 (modern) - Alpine, Ubuntu 22.04+, Debian 11+, Fedora, Alma/Rocky 9+
+if [ -f /sys/fs/cgroup/memory.max ]; then
+  val=$(cat /sys/fs/cgroup/memory.max 2>/dev/null)
+  if [ "$val" != "max" ] && [ -n "$val" ]; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Check for cgroup v1 (older systems) - RHEL/CentOS 7/8, some Debian/Ubuntu
+elif [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  val=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Alpine fallback: check memory.current as limit (some Alpine configs)
+elif [ -f /sys/fs/cgroup/memory.current ]; then
+  val=$(cat /sys/fs/cgroup/memory.current 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
     MEMORY_LIMIT_BYTES=$val
   fi
 fi
@@ -46,19 +65,23 @@ fi
 
 # --- Read CPU quota ---
 CPU_INFO="unknown"
-if [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
-  quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
-  period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+
+# Check for cgroup v2 (modern)
+if [ -f /sys/fs/cgroup/cpu.max ]; then
+  max_line=$(cat /sys/fs/cgroup/cpu.max 2>/dev/null)
+  if [ -n "$max_line" ]; then
+    quota=$(echo "$max_line" | awk '{print $1}')
+    period=$(echo "$max_line" | awk '{print $2}')
+    if [ "$quota" != "max" ] && [ "$quota" -gt 0 ] 2>/dev/null; then
+      CPU_INFO="$((quota / period)) cores (limited)"
+    else
+      CPU_INFO="no limit (request-only)"
+    fi
+# Check for cgroup v1 (older systems)
+elif [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
+  quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null)
+  period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null)
   if [ "$quota" -gt 0 ] 2>/dev/null; then
-    CPU_INFO="$((quota / period)) cores (limited)"
-  else
-    CPU_INFO="no limit (request-only)"
-  fi
-elif [ -f /sys/fs/cgroup/cpu.max ]; then
-  max_line=$(cat /sys/fs/cgroup/cpu.max)
-  quota=$(echo "$max_line" | awk '{print $1}')
-  period=$(echo "$max_line" | awk '{print $2}')
-  if [ "$quota" != "max" ] && [ "$quota" -gt 0 ] 2>/dev/null; then
     CPU_INFO="$((quota / period)) cores (limited)"
   else
     CPU_INFO="no limit (request-only)"
@@ -67,7 +90,9 @@ fi
 
 # --- Print runner info ---
 echo "════════════════════════════════════════════════════════"
+{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
 echo "👕 Runner T-Shirt Size: ${RUNNER_SIZE}"
+{% endif %}
 echo "📈 Memory Limit:        ${MEMORY_LIMIT_HUMAN}"
 echo "🖥️  CPU:                 ${CPU_INFO}"
 if [ -n "$CI_RUNNER_DESCRIPTION" ]; then
@@ -78,20 +103,20 @@ echo "════════════════════════�
 # --- Start memory + CPU monitor in background ---
 nohup sh -c "
 while true; do
-  # Memory
-  if [ -f /sys/fs/cgroup/memory/memory.usage_in_bytes ]; then
-    cat /sys/fs/cgroup/memory/memory.usage_in_bytes
-  elif [ -f /sys/fs/cgroup/memory.current ]; then
+  # Memory - try cgroup v2 first, then v1
+  if [ -f /sys/fs/cgroup/memory.current ]; then
     cat /sys/fs/cgroup/memory.current
+  elif [ -f /sys/fs/cgroup/memory.usage_in_bytes ]; then
+    cat /sys/fs/cgroup/memory.usage_in_bytes
   else
     echo 0
   fi >> $MONITOR_DIR/memory.log
 
-  # CPU usage (nanoseconds)
-  if [ -f /sys/fs/cgroup/cpu/cpuacct.usage ]; then
-    cat /sys/fs/cgroup/cpu/cpuacct.usage
-  elif [ -f /sys/fs/cgroup/cpu.stat ]; then
+  # CPU usage (nanoseconds) - try cgroup v2 first, then v1
+  if [ -f /sys/fs/cgroup/cpu.stat ]; then
     awk '/^usage_usec/ {print \$2 * 1000}' /sys/fs/cgroup/cpu.stat
+  elif [ -f /sys/fs/cgroup/cpu/cpuacct.usage ]; then
+    cat /sys/fs/cgroup/cpu/cpuacct.usage
   else
     echo 0
   fi >> $MONITOR_DIR/cpu.log
