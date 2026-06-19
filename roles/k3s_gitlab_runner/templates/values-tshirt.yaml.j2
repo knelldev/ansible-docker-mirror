@@ -1,19 +1,19 @@
 {%- set usable = (ansible_play_hosts | map('extract', hostvars, 'ansible_memtotal_mb') | min | int) - (k3s_gitlab_runner_system_reserved_mb | int) -%}
-{%- set pool_mb = ((usable * (100 - (k3s_gitlab_runner_small_pool_pct | int))) / 100) | int if tshirt_item.key in ['l', 'xl', 'xxl'] else ((usable * (k3s_gitlab_runner_small_pool_pct | int)) / 100) | int -%}
-{%- set computed_limit = (pool_mb / (tshirt_item.value.memory_limit_mb | int)) | int -%}
+{%- set pool_mb = ((usable * (100 - (k3s_gitlab_runner_small_pool_pct | int))) / 100) | int if runner_item.key in ['l', 'xl', 'xxl'] else ((usable * (k3s_gitlab_runner_small_pool_pct | int)) / 100) | int -%}
+{%- set computed_limit = (pool_mb / (runner_item.value.memory_limit_mb | int)) | int -%}
 ---
-gitlabUrl: {{ tshirt_item.value.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
+gitlabUrl: {{ runner_item.value.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
 runnerToken: {{ k3s_gitlab_runner_current_token }}
 
 rbac:
   create: true
 
-concurrent: {{ tshirt_item.value.concurrent | default(k3s_gitlab_runner_concurrent) }}
+concurrent: {{ runner_item.value.concurrent | default(k3s_gitlab_runner_concurrent) }}
 
 runners:
   config: |
     [[runners]]
-      name = "k8s-runner-{{ tshirt_item.key }}"
+      name = "k8s-runner-{{ runner_item.key }}"
       limit = {{ computed_limit }}
       executor = "kubernetes"
       pre_build_script = "/opt/gitlab-runner/scripts/pre-build.sh"
@@ -24,9 +24,9 @@ runners:
         pull_policy = "always"
         allowed_pull_policies = ["always", "if-not-present", "never"]
         cpu_request = "{{ tshirt_item.value.cpu_request }}"
-        memory_request = "{{ tshirt_item.value.memory_limit }}"
-        memory_limit = "{{ tshirt_item.value.memory_limit }}"
-{% if tshirt_item.key in ['l', 'xl', 'xxl'] %}
+        memory_request = "{{ runner_item.value.memory_limit }}"
+        memory_limit = "{{ runner_item.value.memory_limit }}"
+{% if runner_item.key in ['l', 'xl', 'xxl'] %}
         priority_class_name = "runner-priority-high"
 {% endif %}
         [[runners.kubernetes.volumes.host_path]]
@@ -35,14 +35,14 @@ runners:
           host_path = "/data/{{ app_name }}/scripts"
           mount_propagation = "None"
           read_only = true
-{% if tshirt_item.value.cache is defined %}
+{% if runner_item.value.cache is defined %}
         [runners.cache]
           Type = "s3"
           Shared = true
           [runners.cache.s3]
-            ServerAddress = "{{ tshirt_item.value.cache.server }}"
-            AccessKey = "{{ tshirt_item.value.cache.access_key }}"
-            SecretKey = "{{ tshirt_item.value.cache.secret_key }}"
-            BucketName = "{{ tshirt_item.value.cache.bucket }}"
-            Insecure = {{ tshirt_item.value.cache.insecure | default(true) | lower }}
+            ServerAddress = "{{ runner_item.value.cache.server }}"
+            AccessKey = "{{ runner_item.value.cache.access_key }}"
+            SecretKey = "{{ runner_item.value.cache.secret_key }}"
+            BucketName = "{{ runner_item.value.cache.bucket }}"
+            Insecure = {{ runner_item.value.cache.insecure | default(true) | lower }}
 {% endif %}

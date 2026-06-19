@@ -1,66 +1,66 @@
 ---
 # Runner registration and deployment
-# item is the loop var: either tshirt_item {key, value} or config_item from k3s_gitlab_runner_config_list
+# runner_item is the loop var: either tshirt_item {key, value} or config_item from k3s_gitlab_runner_config_list
 
-- name: "(register) check if {{ item.key | default(item.name) }} exists"
+- name: "(register) check if {{ runner_item.key | default(runner_item.name) }} exists"
   ansible.builtin.uri:
-    url: "{% if item.group_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/groups/{{ item.group_id }}/runners{% elif item.project_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/projects/{{ item.project_id }}/runners{% else %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners{% endif %}?search={{ item.key | default(item.name) }}"
+    url: "{% if runner_item.group_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/groups/{{ runner_item.group_id }}/runners{% elif runner_item.project_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/projects/{{ runner_item.project_id }}/runners{% else %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners{% endif %}?search={{ runner_item.key | default(runner_item.name) }}"
     headers:
-      PRIVATE-TOKEN: "{{ item.token | default(k3s_gitlab_runner_admin_token) }}"
+      PRIVATE-TOKEN: "{{ runner_item.token | default(k3s_gitlab_runner_admin_token) }}"
     validate_certs: "{{ http.ssl_verify }}"
   register: k3s_gitlab_runner_existing
-  when: (item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
+  when: (runner_item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
 
-- name: "(register) create {{ item.key | default(item.name) }} via API"
+- name: "(register) create {{ runner_item.key | default(runner_item.name) }} via API"
   ansible.builtin.uri:
-    url: "{% if item.group_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/groups/{{ item.group_id }}/runners{% elif item.project_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/projects/{{ item.project_id }}/runners{% else %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners{% endif %}"
+    url: "{% if runner_item.group_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/groups/{{ runner_item.group_id }}/runners{% elif runner_item.project_id is defined %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/projects/{{ runner_item.project_id }}/runners{% else %}{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners{% endif %}"
     method: POST
     headers:
-      PRIVATE-TOKEN: "{{ item.token | default(k3s_gitlab_runner_admin_token) }}"
+      PRIVATE-TOKEN: "{{ runner_item.token | default(k3s_gitlab_runner_admin_token) }}"
     body_format: json
     body: "{{ lookup('template', 'register-body.json.j2') | from_json }}"
     validate_certs: "{{ http.ssl_verify }}"
     status_code: 201
   register: k3s_gitlab_runner_created
   when:
-    - (item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
-    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', item.key | default(item.name)) | list | length) == 0
+    - (runner_item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
+    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', runner_item.key | default(runner_item.name)) | list | length) == 0
 
-- name: "(register) rotate token for existing {{ item.key | default(item.name) }}"
+- name: "(register) rotate token for existing {{ runner_item.key | default(runner_item.name) }}"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ (k3s_gitlab_runner_existing.json | default([]) | selectattr('description', 'search', item.key | default(item.name)) | first).id }}/reset_authentication_token"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ (k3s_gitlab_runner_existing.json | default([]) | selectattr('description', 'search', runner_item.key | default(runner_item.name)) | first).id }}/reset_authentication_token"
     method: POST
     headers:
-      PRIVATE-TOKEN: "{{ item.token | default(k3s_gitlab_runner_admin_token) }}"
+      PRIVATE-TOKEN: "{{ runner_item.token | default(k3s_gitlab_runner_admin_token) }}"
     validate_certs: "{{ http.ssl_verify }}"
     status_code: 200
   register: k3s_gitlab_runner_rotated
   when:
-    - (item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
-    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', item.key | default(item.name)) | list | length) > 0
-    - (item.sizing_changed | default(k3s_gitlab_runner_sizing_changed) | default(true)) | bool
+    - (runner_item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
+    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', runner_item.key | default(runner_item.name)) | list | length) > 0
+    - (runner_item.sizing_changed | default(k3s_gitlab_runner_sizing_changed) | default(true)) | bool
 
-- name: "(register) deploy helm chart for {{ item.key | default(item.name) }}"
+- name: "(register) deploy helm chart for {{ runner_item.key | default(runner_item.name) }}"
   kubernetes.core.helm:
-    name: "{{ item.key | default(item.name) }}"
+    name: "{{ runner_item.key | default(runner_item.name) }}"
     chart_ref: gitlab/gitlab-runner
     namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
     update_repo_cache: true
-    values: "{{ lookup('template', ('values-tshirt.yaml.j2' if item.key is defined else 'values.yaml.j2')) | from_yaml }}"
+    values: "{{ lookup('template', ('values-tshirt.yaml.j2' if runner_item.key is defined else 'values.yaml.j2')) | from_yaml }}"
     kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
     binary_path: /usr/local/bin/helm
     validate_certs: "{{ http.ssl_verify }}"
-    force: "{{ item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) }}"
-  when: item.token is defined or (item.key is defined and item.value is defined) or (item.runner_type is defined)
+    force: "{{ runner_item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) }}"
+  when: runner_item.token is defined or (runner_item.key is defined and runner_item.value is defined) or (runner_item.runner_type is defined)
 
-- name: "(healthcheck) verify {{ item.key | default(item.name) }} is registered"
+- name: "(healthcheck) verify {{ runner_item.key | default(runner_item.name) }} is registered"
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ (k3s_gitlab_runner_existing.json | default([]) | selectattr('description', 'search', item.key | default(item.name)) | first).id }}"
+    url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ (k3s_gitlab_runner_existing.json | default([]) | selectattr('description', 'search', runner_item.key | default(runner_item.name)) | first).id }}"
     headers:
-      PRIVATE-TOKEN: "{{ item.token | default(k3s_gitlab_runner_admin_token) }}"
+      PRIVATE-TOKEN: "{{ runner_item.token | default(k3s_gitlab_runner_admin_token) }}"
     validate_certs: "{{ http.ssl_verify }}"
   register: k3s_gitlab_runner_verify
   when:
-    - (item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
-    - item.skip_healthcheck | default(false) == false
-    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', item.key | default(item.name)) | list | length) > 0
+    - (runner_item.token is defined) or (k3s_gitlab_runner_admin_token is defined)
+    - runner_item.skip_healthcheck | default(false) == false
+    - ((k3s_gitlab_runner_existing.json | default([])) | selectattr('description', 'search', runner_item.key | default(runner_item.name)) | list | length) > 0

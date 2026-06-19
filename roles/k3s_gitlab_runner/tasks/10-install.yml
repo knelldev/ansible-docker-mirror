@@ -32,4 +32,4 @@
       ansible.builtin.include_tasks: register.yml
       loop: "{{ (k3s_gitlab_runner_tshirt_sizes | dict2items | list) + k3s_gitlab_runner_config_list }}"
       loop_control:
-        loop_var: item
+        loop_var: runner_item

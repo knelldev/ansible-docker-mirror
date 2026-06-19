@@ -1,27 +1,27 @@
 ---
-gitlabUrl: {{ item.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
-runnerToken: {{ item.token | default(k3s_gitlab_runner_token) }}
+gitlabUrl: {{ runner_item.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
+runnerToken: {{ runner_item.token | default(k3s_gitlab_runner_token) }}
 
 rbac:
   create: true
 
-concurrent: {{ item.concurrent | default(k3s_gitlab_runner_concurrent) }}
+concurrent: {{ runner_item.concurrent | default(k3s_gitlab_runner_concurrent) }}
 
 runners:
   config: |
     [[runners]]
-      name = "{{ item.name }}"
+      name = "{{ runner_item.name }}"
       executor = "kubernetes"
 {% if k3s_gitlab_runner_hooks_enabled | default(true) %}
       pre_build_script = "/opt/gitlab-runner/scripts/pre-build.sh"
       post_build_script = "/opt/gitlab-runner/scripts/post-build.sh"
 {% endif %}
       [runners.kubernetes]
-        image = "{{ item.image | default('python:3') }}"
-        poll_timeout = {{ item.poll_timeout | default(k3s_gitlab_runner_poll_timeout) }}
+        image = "{{ runner_item.image | default('python:3') }}"
+        poll_timeout = {{ runner_item.poll_timeout | default(k3s_gitlab_runner_poll_timeout) }}
         pull_policy = "always"
         allowed_pull_policies = ["always", "if-not-present", "never"]
-        privileged = {{ item.privileged | default(false) | lower }}
+        privileged = {{ runner_item.privileged | default(false) | lower }}
 {% if k3s_gitlab_runner_hooks_enabled | default(true) %}
         [[runners.kubernetes.volumes.host_path]]
           name = "runner-scripts"
@@ -30,17 +30,17 @@ runners:
           mount_propagation = "None"
           read_only = true
 {% endif %}
-{% if item.cache is defined %}
+{% if runner_item.cache is defined %}
         [runners.cache]
           Type = "s3"
           Shared = true
           [runners.cache.s3]
-            ServerAddress = "{{ item.cache.server }}"
-            AccessKey = "{{ item.cache.access_key }}"
-            SecretKey = "{{ item.cache.secret_key }}"
-            BucketName = "{{ item.cache.bucket }}"
-            Insecure = {{ item.cache.insecure | default(true) | lower }}
+            ServerAddress = "{{ runner_item.cache.server }}"
+            AccessKey = "{{ runner_item.cache.access_key }}"
+            SecretKey = "{{ runner_item.cache.secret_key }}"
+            BucketName = "{{ runner_item.cache.bucket }}"
+            Insecure = {{ runner_item.cache.insecure | default(true) | lower }}
 {% endif %}
-{% if item.extra_config is defined %}
-    {{ item.extra_config | indent(4) }}
+{% if runner_item.extra_config is defined %}
+    {{ runner_item.extra_config | indent(4) }}
 {% endif %}

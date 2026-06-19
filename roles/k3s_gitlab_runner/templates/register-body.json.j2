@@ -1,11 +1,11 @@
 {
-  "runner_type": "{{ item.runner_type | default('instance_type') }}",
-  "description": "{{ ('k8s-runner-' + item.key ~ ' | cpu=' ~ item.value.cpu_request ~ ' mem=' ~ item.value.memory_limit) if item.key is defined else (item.description | default(item.name)) }}",
-{% if item.group_id is defined %}
-  "group_id": {{ item.group_id | to_json }},
+  "runner_type": "{{ runner_item.runner_type | default('instance_type') }}",
+  "description": "{{ ('k8s-runner-' + runner_item.key ~ ' | cpu=' ~ runner_item.value.cpu_request ~ ' mem=' ~ runner_item.value.memory_limit) if runner_item.key is defined else (runner_item.description | default(runner_item.name)) }}",
+{% if runner_item.group_id is defined %}
+  "group_id": {{ runner_item.group_id | to_json }},
 {% endif %}
-{% if item.project_id is defined %}
-  "project_id": {{ item.project_id | to_json }},
+{% if runner_item.project_id is defined %}
+  "project_id": {{ runner_item.project_id | to_json }},
 {% endif %}
-  "tag_list": {{ ['docker-' + item.key, 'k8s-' + item.key, 'shared-' + item.key] if item.key is defined else (item.tags | default(item.name) | split(',') | map('trim') | list) | to_json }}
+  "tag_list": {{ ['docker-' + runner_item.key, 'k8s-' + runner_item.key, 'shared-' + runner_item.key] if runner_item.key is defined else (runner_item.tags | default(runner_item.name) | split(',') | map('trim') | list) | to_json }}
 }
