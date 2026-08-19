@@ -11,11 +11,11 @@ fi
 
 # Fallback: find most recent monitor dir
 if [ -z "$MONITOR_DIR" ] || [ ! -d "$MONITOR_DIR" ]; then
-  MONITOR_DIR=$(ls -dt /tmp/runner_monitor_* 2>/dev/null | head -1)
+  MONITOR_DIR=$(find /tmp -maxdepth 1 -type d -name 'runner_monitor_*' -print 2>/dev/null | sort | tail -1)
 fi
 
 if [ -z "$MONITOR_DIR" ] || [ ! -d "$MONITOR_DIR" ]; then
-  echo "📊 Resource monitor: no data collected"
+  echo "Resource monitor: no data collected"
   exit 0
 fi
 
@@ -63,6 +63,16 @@ if [ "$MEM_COUNT" -gt 0 ]; then
   AVG_MEM_MB=$((TOTAL_MEM_BYTES / MEM_COUNT / 1024 / 1024))
   MAX_MEM_MB=$((MAX_MEM_BYTES / 1024 / 1024))
 fi
+
+# --- Disk stats ---
+DISK_AVAILABLE_MB="N/A"
+WORKSPACE_USAGE_MB="N/A"
+if command -v df >/dev/null 2>&1; then
+  DISK_AVAILABLE_MB=$(df -Pm / 2>/dev/null | awk 'NR==2 {print $4}')
+  WORKSPACE_USAGE_MB=$(du -sm "${CI_PROJECT_DIR:-.}" 2>/dev/null | awk 'NR==1 {print $1}')
+fi
+case "$DISK_AVAILABLE_MB" in ''|*[!0-9]*) DISK_AVAILABLE_MB="N/A" ;; esac
+case "$WORKSPACE_USAGE_MB" in ''|*[!0-9]*) WORKSPACE_USAGE_MB="N/A" ;; esac
 
 # --- CPU stats ---
 CPU_START_NS=0
@@ -113,21 +123,15 @@ fi
 
 # --- Print report ---
 echo ""
-echo "════════════════════════════════════════════════════════"
-echo "📊 Job Resource Report"
-echo "────────────────────────────────────────────────────────"
-{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
-if [ "$RUNNER_SIZE" != "custom" ]; then
-  echo "   ⏱️  Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
-  echo "   👕 Runner Size:    ${RUNNER_SIZE}"
-fi
-{% else %}
-echo "   ⏱️  Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
-{% endif %}
-echo "────────────────────────────────────────────────────────"
-echo "   📈 Memory Average: ${AVG_MEM_MB} MB"
-echo "   📈 Memory Peak:    ${MAX_MEM_MB} MB"
-echo "   📈 Samples:        ${MEM_COUNT}"
+echo "=========================================================="
+echo "Job resource report"
+echo "----------------------------------------------------------"
+echo "Runtime:        ${DURATION_MIN}m ${DURATION_SEC}s (${DURATION}s total)"
+echo "Runner size:    ${RUNNER_SIZE}"
+echo "----------------------------------------------------------"
+echo "Memory average: ${AVG_MEM_MB} MB"
+echo "Memory peak:    ${MAX_MEM_MB} MB"
+echo "Samples:        ${MEM_COUNT}"
 
 if [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
   LIMIT_MB=$((MEMORY_LIMIT_BYTES / 1024 / 1024))
@@ -136,19 +140,18 @@ if [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
   else
     MEM_PCT=0
   fi
-  echo "   📈 Memory Limit:   ${LIMIT_MB} MB"
-  echo "   📈 Peak Usage:     ${MEM_PCT}%"
+  echo "Memory limit:   ${LIMIT_MB} MB"
+  echo "Peak usage:     ${MEM_PCT}%"
 fi
 
-echo "────────────────────────────────────────────────────────"
-echo "   🖥️  CPU Time:       ${CPU_USED_SEC}s"
-echo "   🖥️  Avg CPU Cores:  ${CPU_AVG_CORES}"
-echo "────────────────────────────────────────────────────────"
+echo "----------------------------------------------------------"
+echo "CPU time:       ${CPU_USED_SEC}s"
+echo "Avg CPU cores:  ${CPU_AVG_CORES}"
+echo "----------------------------------------------------------"
 
-{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
 # --- Size recommendation (t-shirt sizes only) ---
 if [ "$RUNNER_SIZE" != "custom" ] && [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null && [ "$MAX_MEM_MB" -gt 0 ]; then
-  if [ "$MEM_PCT" -ge 80 ]; then
+  if [ "$MEM_PCT" -ge {{ k3s_gitlab_runner_hook_memory_upgrade_threshold_pct | int }} ]; then
     case "$RUNNER_SIZE" in
       xs)  NEXT="s" ;;
       s)   NEXT="m" ;;
@@ -158,12 +161,12 @@ if [ "$RUNNER_SIZE" != "custom" ] && [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null
       xxl) NEXT="" ;;
     esac
     if [ -n "$NEXT" ]; then
-      echo "   ⚠️  Peak memory at ${MEM_PCT}% of limit!"
-      echo "   💡 Recommendation: upgrade to k8s-${NEXT}"
+        echo "Peak memory at ${MEM_PCT}% of limit"
+        echo "Recommendation: upgrade to k8s-${NEXT}"
     else
-      echo "   ⚠️  Peak memory at ${MEM_PCT}% of limit (already max size)"
+        echo "Peak memory at ${MEM_PCT}% of limit (already max size)"
     fi
-  elif [ "$MEM_PCT" -lt 40 ]; then
+  elif [ "$MEM_PCT" -lt {{ k3s_gitlab_runner_hook_memory_downgrade_threshold_pct | int }} ]; then
     case "$RUNNER_SIZE" in
       xs)  PREV="" ;;
       s)   PREV="xs" ;;
@@ -173,22 +176,23 @@ if [ "$RUNNER_SIZE" != "custom" ] && [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null
       xxl) PREV="xl" ;;
     esac
     if [ -n "$PREV" ]; then
-      echo "   💚 Peak memory only ${MEM_PCT}% of limit"
-      echo "   💡 Recommendation: consider downgrading to k8s-${PREV}"
+        echo "Peak memory only ${MEM_PCT}% of limit"
+        echo "Recommendation: consider downgrading to k8s-${PREV}"
     else
-      echo "   💚 Memory usage is efficient (${MEM_PCT}%)"
+        echo "Memory usage is efficient (${MEM_PCT}%)"
     fi
   else
-    echo "   ✅ Memory usage is appropriate (${MEM_PCT}%)"
+    echo "Memory usage is appropriate (${MEM_PCT}%)"
   fi
 else
   if [ "$RUNNER_SIZE" = "custom" ]; then
-    echo "   ℹ️  Custom runner — no size recommendation"
+    echo "Custom runner: no size recommendation"
   fi
 fi
-{% endif %}
 
-echo "════════════════════════════════════════════════════════"
+echo "=========================================================="
+
+echo "RUNNER_METRICS duration_seconds=${DURATION} memory_peak_mb=${MAX_MEM_MB} memory_limit_mb=${LIMIT_MB:-N/A} memory_pct=${MEM_PCT:-N/A} cpu_avg_cores=${CPU_AVG_CORES} disk_available_mb=${DISK_AVAILABLE_MB} workspace_mb=${WORKSPACE_USAGE_MB}"
 
 # Cleanup
 rm -rf "$MONITOR_DIR"

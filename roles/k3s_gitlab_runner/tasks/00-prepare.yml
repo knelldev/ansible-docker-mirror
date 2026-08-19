@@ -1,8 +1,22 @@
 ---
-- name: "block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "Create {{ app_name }} dirs"
+    - name: Record available root filesystem capacity
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_root_available_gib: >-
+          {{
+            (
+              ansible_mounts
+              | selectattr('mount', 'equalto', '/')
+              | map(attribute='size_available')
+              | first
+              | default(0)
+              | int
+            ) / 1073741824
+          }}
+
+    - name: Create role data directories
       ansible.builtin.file:
         path: "{{ app_path }}/{{ item.name }}"
         state: directory
@@ -11,3 +25,24 @@
         mode: "{{ item.mode | default('0755') }}"
       loop:
         - name: ""
+
+    - name: Ensure runner hook directory exists
+      ansible.builtin.file:
+        path: "{{ app_path }}/scripts"
+        state: directory
+        mode: "0755"
+      when: k3s_gitlab_runner_hooks_enabled | bool
+
+    - name: Deploy runner pre-build hook
+      ansible.builtin.template:
+        src: pre-build.sh.j2
+        dest: "{{ app_path }}/scripts/pre-build.sh"
+        mode: "0755"
+      when: k3s_gitlab_runner_hooks_enabled | bool
+
+    - name: Deploy runner post-build hook
+      ansible.builtin.template:
+        src: post-build.sh.j2
+        dest: "{{ app_path }}/scripts/post-build.sh"
+        mode: "0755"
+      when: k3s_gitlab_runner_hooks_enabled | bool

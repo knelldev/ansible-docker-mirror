@@ -1,2 +1,4 @@
-skip_list:
-  - name[template] # Jinja templates should only be at the end of 'name'
+---
+# .ansible-lint
+
+profile: production # min, basic, moderate,safety, shared,

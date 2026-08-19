@@ -1,0 +1,40 @@
+##############################################################################
+# General main for our roles.
+# Does not need any changes and will use an ascending number order for the tasks.
+# Tasks without a leading number will not be included automatically.
+##############################################################################
+---
+- name: Check for unconfigured mandatory variables
+  vars:
+    _varnames: "{{ q('ansible.builtin.varnames', '^' + role_name + '_') }}"
+    _missing: >-
+      {{
+        _varnames | map('extract', hostvars[inventory_hostname])
+        | selectattr('value', 'defined')
+        | selectattr('value', 'string')
+        | selectattr('value', 'search', '__REQUIRED__')
+        | list | map(attribute='key')
+      }}
+  ansible.builtin.fail:
+    msg: |
+      The following variables must be configured in the host inventory:
+      {{ _missing | join('\n') }}
+  when: _missing | length > 0
+
+# Load additional OS specific configuration from vars folder
+- name: Load vars for os if available
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
+      skip: true
+
+# Include numbered task files in ascending order (##-name.yml pattern)
+- name: Include tasks
+  ansible.builtin.include_tasks: "{{ item }}"
+  loop: "{{ q('fileglob', role_path + '/tasks/[0-9][0-9]-*.yml') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"

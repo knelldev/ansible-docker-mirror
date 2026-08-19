@@ -1,0 +1,8 @@
+---
+# vars file for role_name
+app_name: "{{ vars[role_name + '_name'] | default(role_name.split('_')[1]) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ vars[role_name + '_path'] | default(storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ vars[role_name + '_user'] | default(app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ vars[role_name + '_group'] | default(app_user) }}" # noqa var-naming[no-role-prefix]
+
+app_user_create: "{{ vars[role_name + '_user_create'] | default(false) }}" # noqa var-naming[no-role-prefix]

@@ -1,5 +1,5 @@
 ---
-- name: "({{ task_filename }}) Create a new group"
+- name: Create a new group
   ansible.builtin.win_group:
     name: docker-users
     description: docker-users group
@@ -12,17 +12,17 @@
 #     state: present
 #   loop: "{{ win_docker_users }}"
 
-- name: "({{ task_filename }}) Template docker daemon.json"
+- name: Template docker daemon.json
   ansible.builtin.win_template:
     src: "daemon.json.j2"
     dest: 'C:\ProgramData\docker\config\daemon.json'
 
-- name: "({{ task_filename }}) Restart docker servioce"
+- name: Restart docker servioce
   ansible.builtin.win_service:
     name: docker
     state: restarted
 
-# - name: "({{ task_filename }} Add docker-users to docker_engine pipe ACL"
+# - name: Add docker-users to docker_engine pipe ACL
 #   ansible.windows.win_acl:
 #     path: //./pipe/docker_engine
 #     user: docker-users
@@ -30,7 +30,7 @@
 #     type: allow
 #     state: present
 
-- name: "({{ task_filename }} Add docker-users to docker_engine pipe ACL"
+- name: Add docker-users to docker_engine pipe ACL
   ansible.windows.win_powershell:
     script: |
       # Define the named pipe's path

@@ -1,9 +1,9 @@
 ---
-- name: "({{ task_filename }}) configure dnf-automatic"
+- name: Configure dnf-automatic
   become: true
   when: os_prepare_dnf_automatic_enabled
   block:
-    - name: "({{ task_filename }}) configure dnf-automatic.conf"
+    - name: Configure dnf-automatic.conf
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -12,28 +12,28 @@
         - src: dnf-automatic.conf.j2
           dest: /etc/dnf/automatic.conf
 
-    - name: "({{ task_filename }}) enable dnf-automatic timer"
+    - name: Enable dnf-automatic timer
       ansible.builtin.service:
         state: restarted
         enabled: true
         name: dnf-automatic.timer
 
-- name: "({{ task_filename }}) configure journald"
+- name: Configure journald
   become: true
   when: os_prepare_journald_configure
   block:
-    - name: "({{ task_filename }}) create journald config override dir"
+    - name: Create journald config override dir
       ansible.builtin.file:
         path: /etc/systemd/journald.conf.d/
         state: directory
         mode: "0755"
 
-    - name: "({{ task_filename }}) remove journald config override"
+    - name: Remove journald config override
       ansible.builtin.file:
         path: /etc/systemd/journald.conf.d/00-ansible.conf
         state: absent
 
-    - name: "({{ task_filename }}) configure journald limits with ini_file"
+    - name: Configure journald limits with ini_file
       ansible.builtin.ini_file:
         path: /etc/systemd/journald.conf.d/00-ansible.conf
         section: "Journal"
@@ -52,16 +52,16 @@
       loop_control:
         label: "{{ item.option }}"
 
-    - name: "({{ task_filename }}) enable systemd-journald"
+    - name: Enable systemd-journald
       ansible.builtin.service:
         state: restarted
         enabled: true
         name: systemd-journald
 
-- name: "({{ task_filename }}) configure logrotate"
+- name: Configure logrotate
   become: true
   block:
-    - name: "({{ task_filename }}) Manage compression in logrotate.conf"
+    - name: Manage compression in logrotate.conf
       ansible.builtin.lineinfile:
         path: /etc/logrotate.conf
         regexp: '^\s*#?\s*compress\s*$'

@@ -22,13 +22,6 @@ if [ -n "$CI_RUNNER_TAGS" ]; then
 fi
 echo "$RUNNER_SIZE" > "$MONITOR_DIR/runner_size"
 
-# --- Only show t-shirt size info for actual t-shirt runners ---
-{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
-if [ "$RUNNER_SIZE" != "custom" ]; then
-  echo "👕 Runner T-Shirt Size: ${RUNNER_SIZE}"
-fi
-{% endif %}
-
 # --- Read actual memory limit from cgroup ---
 MEMORY_LIMIT_BYTES=0
 
@@ -77,6 +70,7 @@ if [ -f /sys/fs/cgroup/cpu.max ]; then
     else
       CPU_INFO="no limit (request-only)"
     fi
+  fi
 # Check for cgroup v1 (older systems)
 elif [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
   quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null)
@@ -89,16 +83,14 @@ elif [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.c
 fi
 
 # --- Print runner info ---
-echo "════════════════════════════════════════════════════════"
-{% if k3s_gitlab_runner_tshirt_enabled | default(true) %}
-echo "👕 Runner T-Shirt Size: ${RUNNER_SIZE}"
-{% endif %}
-echo "📈 Memory Limit:        ${MEMORY_LIMIT_HUMAN}"
-echo "🖥️  CPU:                 ${CPU_INFO}"
+echo "=========================================================="
+echo "Runner size:  ${RUNNER_SIZE}"
+echo "Memory limit: ${MEMORY_LIMIT_HUMAN}"
+echo "CPU:          ${CPU_INFO}"
 if [ -n "$CI_RUNNER_DESCRIPTION" ]; then
-  echo "📋 Description:         ${CI_RUNNER_DESCRIPTION}"
+  echo "Description:  ${CI_RUNNER_DESCRIPTION}"
 fi
-echo "════════════════════════════════════════════════════════"
+echo "=========================================================="
 
 # --- Start memory + CPU monitor in background ---
 nohup sh -c "
@@ -121,7 +113,7 @@ while true; do
     echo 0
   fi >> $MONITOR_DIR/cpu.log
 
-  sleep 5
+  sleep {{ k3s_gitlab_runner_hook_sample_interval_seconds | int }}
 done
 " > /dev/null 2>&1 &
 
@@ -129,4 +121,4 @@ echo $! > "$MONITOR_DIR/monitor_pid"
 
 # Store monitor dir path for post-build
 echo "$MONITOR_DIR" > /tmp/runner_monitor_dir
-echo "📊 Resource monitor started (dir: $MONITOR_DIR)"
+echo "Resource monitor started"

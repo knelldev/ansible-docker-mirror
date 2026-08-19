@@ -1,33 +1,33 @@
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) Download minio client"
+    - name: Download minio client
       ansible.builtin.get_url:
         url: "https://dl.min.io/client/mc/release/linux-amd64/mc"
         dest: "/usr/local/bin/mc"
         mode: "755"
 
-- name: "({{ task_filename }}) block for become=false"
+- name: Block for become=false
   become: false
   block:
-    - name: "({{ task_filename }}) Minio: set alias"
+    - name: "Minio: set alias"
       ansible.builtin.shell: |
         mc alias set ansible {{ con_minio_url }} {{ con_minio_root_user }} {{ con_minio_root_password }}
       # no_log: true
 
-    - name: "({{ task_filename }}) Minio: create users"
+    - name: "Minio: create users"
       ansible.builtin.shell: |
         mc admin user add ansible {{ item.accesskey }} {{ item.secretkey }}
         mc admin policy attach ansible readwrite --user={{ item.accesskey }}
       # no_log:: true
       loop: "{{ con_minio_identities }}"
 
-    - name: "({{ task_filename }}) Minio: Configure alias for mc"
+    - name: "Minio: Configure alias for mc"
       ansible.builtin.shell: |
         mc mb -p ansible/{{ item.name }}
       loop: "{{ con_minio_buckets }}"
 
-    - name: "({{ task_filename }}) Minio: Configure expire"
+    - name: "Minio: Configure expire"
       ansible.builtin.shell: |
         mc ilm rule rm --all --force ansible/{{ item.name }}
         mc ilm rule add --expire-days {{ item.expire_days }} ansible/{{ item.name }}

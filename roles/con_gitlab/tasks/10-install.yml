@@ -1,8 +1,8 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) Template {{ app_name }} files"
+    - name: Template {{ app_name }} files
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -16,7 +16,7 @@
           dest: "{{ app_path }}/config/post-reconfigure.sh"
           mode: "0755"
 
-    - name: "({{ task_filename }}) Template {{ app_name }} network"
+    - name: Template {{ app_name }} network
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -26,7 +26,7 @@
           dest: /etc/containers/systemd/{{ con_gitlab_container_network_name }}.network
       when: con_gitlab_container_network_create
 
-    - name: "({{ task_filename }}) Create a symbolic links for container services"
+    - name: Create a symbolic links for container services
       ansible.builtin.file:
         src: "/etc/containers/systemd/{{ item }}"
         dest: "{{ app_path }}/quadlet-{{ item }}"
@@ -35,13 +35,13 @@
         - "gitlab.container"
         - "gitlab_default.network"
 
-    - name: "({{ task_filename }}) start {{ app_name }} quadlet"
+    - name: Start {{ app_name }} quadlet
       ansible.builtin.systemd_service:
         state: "{{ con_gitlab_systemd_service_state }}"
         daemon_reload: true
         name: gitlab
 
-    - name: "({{ task_filename }}) Ensure Application is started and accepting connections"
+    - name: Ensure Application is started and accepting connections
       ansible.builtin.uri:
         url: "{{ con_gitlab_external_url }}"
         return_content: true

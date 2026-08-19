@@ -1,13 +1,13 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) Ensure epel-release is installed"
+    - name: Ensure epel-release is installed
       ansible.builtin.dnf:
         name: epel-release
         state: present
 
-    - name: "({{ task_filename }}) Ensure podman is installed"
+    - name: Ensure podman is installed
       ansible.builtin.dnf:
         name:
           - podman
@@ -15,23 +15,23 @@
           - podman-compose
         state: present
 
-    - name: "({{ task_filename }}) Replace graphroot path in configuration file"
+    - name: Replace graphroot path in configuration file
       ansible.builtin.lineinfile:
         path: /etc/containers/storage.conf
         regexp: '^graphroot\s*=\s*'
         line: 'graphroot = "{{ os_container_data_root }}"'
       register: graphroot_lineinfile
 
-    - name: "({{ task_filename }}) Restart podman service"
+    - name: Restart podman service
       ansible.builtin.service:
         state: restarted
         enabled: true
         name: podman
 
-    - name: "({{ task_filename }}) Apply SELinux context recursively to Podman storage 1/2" # noqa no-changed-value
+    - name: Apply SELinux context recursively to Podman storage 1/2 # noqa no-changed-value
       ansible.builtin.command: semanage fcontext -a -e /var/lib/containers/storage {{ os_container_data_root }}
       when: graphroot_lineinfile.changed
 
-    - name: "({{ task_filename }}) Apply SELinux context recursively to Podman storage 2/2" # noqa no-changed-value
+    - name: Apply SELinux context recursively to Podman storage 2/2 # noqa no-changed-value
       ansible.builtin.command: restorecon -R -v {{ os_container_data_root }}
       when: graphroot_lineinfile.changed

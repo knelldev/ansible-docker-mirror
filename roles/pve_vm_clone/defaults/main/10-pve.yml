@@ -37,6 +37,7 @@ pve_vm_clone_timeout: 300 # Timeout in seconds for the Proxmox create/clone oper
 pve_vm_clone_ci_user: "ubuntu"
 pve_vm_clone_ci_ssh_key: "" # Public SSH key content (required for SSH access)
 
+
 # --- Full Network Config (Advanced/Override) ---
 # Use this if you need to specify more complex options like IPv6.
 # If set, this will be used instead of the partial config above.

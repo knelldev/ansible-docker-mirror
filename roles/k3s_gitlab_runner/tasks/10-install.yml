@@ -1,35 +1,543 @@
 ---
-- name: "k3s server block"
+- name: K3s server block
   become: true
   run_once: true
   block:
-    - name: "(register) check GitLab version"
-      ansible.builtin.uri:
-        url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/version"
-        headers:
-          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
-        validate_certs: "{{ http.ssl_verify }}"
-      register: k3s_gitlab_runner_gitlab_version_result
-      run_once: true
-      when: k3s_gitlab_runner_admin_token is defined
-
-    - name: "(register) fail if GitLab < 17.0"
-      ansible.builtin.fail:
-        msg: >-
-          GitLab version {{ k3s_gitlab_runner_gitlab_version_result.json.version }} is below
-          {{ k3s_gitlab_runner_min_gitlab_version }}. Runner auto-registration requires >= 17.0.
-      when:
-        - k3s_gitlab_runner_gitlab_version_result.json.version is version(k3s_gitlab_runner_min_gitlab_version, '<')
-
     - name: Add stable gitlab chart repo
       kubernetes.core.helm_repository:
         name: gitlab
         repo_url: "https://charts.gitlab.io"
-        binary_path: /usr/local/bin/helm
+        binary_path: "{{ k3s_gitlab_runner_helm_binary_path }}"
+
+    - name: Read schedulable Kubernetes nodes
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_runner_nodes
+
+    - name: Count schedulable Kubernetes nodes
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_schedulable_node_count: >-
+          {{
+            k3s_gitlab_runner_nodes.resources | default([])
+            | map(attribute='spec.unschedulable', default=false)
+            | reject('equalto', true)
+            | list | length
+          }}
+
+    - name: Calculate runner manager replica count
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_manager_replicas_effective: >-
+          {{
+            k3s_gitlab_runner_manager_replicas | int
+            if k3s_gitlab_runner_manager_replicas is not none
+            else (
+              [
+                [
+                  1,
+                  k3s_gitlab_runner_schedulable_node_count | int
+                ] | max,
+                k3s_gitlab_runner_manager_replicas_max | int
+              ] | min
+              if k3s_gitlab_runner_manager_replicas_auto | bool
+              else 1
+            )
+          }}
+
+    - name: Require root disk facts for automatic storage sizing
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_play_hosts
+            | map('extract', hostvars, 'k3s_gitlab_runner_root_available_gib')
+            | map('float') | min > 0
+        fail_msg: >-
+          Automatic ephemeral storage sizing requires readable root filesystem
+          facts on every runner host.
+      when: k3s_gitlab_runner_ephemeral_storage_enabled | bool
+
+    - name: Calculate automatic ephemeral storage budget
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_ephemeral_storage_budget_gib: >-
+          {{
+            [
+              0,
+              (
+                (
+                  ansible_play_hosts
+                  | map('extract', hostvars, 'k3s_gitlab_runner_root_available_gib')
+                  | map('float')
+                  | min
+                )
+                - [
+                  k3s_gitlab_runner_ephemeral_storage_buffer_min_gib | float,
+                  (
+                    ansible_play_hosts
+                    | map('extract', hostvars, 'k3s_gitlab_runner_root_available_gib')
+                    | map('float')
+                    | min
+                    * k3s_gitlab_runner_ephemeral_storage_buffer_pct | float / 100
+                  )
+                ] | max
+              ) / (k3s_gitlab_runner_concurrent | int)
+            ] | max
+          }}
+      when: k3s_gitlab_runner_ephemeral_storage_enabled | bool
+
+    - name: Read smallest target memory
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_minimum_node_memory_mb: >-
+          {{
+            ansible_play_hosts
+            | map('extract', hostvars, 'ansible_memtotal_mb')
+            | min | int
+          }}
+
+    - name: Calculate nominal memory eligibility
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_eligibility_memory_mb: >-
+          {{
+            [
+              k3s_gitlab_runner_minimum_node_memory_mb | int
+              + k3s_gitlab_runner_tshirt_memory_fixed_allowance_mb | int,
+              (
+                k3s_gitlab_runner_minimum_node_memory_mb | int * 100
+                / (100 - k3s_gitlab_runner_tshirt_memory_tolerance_pct | int)
+              ) | int
+            ] | max
+          }}
+
+    - name: Select eligible T-shirt runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_tshirt_runners: >-
+          {{
+            k3s_gitlab_runner_tshirt_sizes | dict2items
+            | selectattr(
+              'value.min_node_mb',
+              'le',
+              k3s_gitlab_runner_eligibility_memory_mb | int
+            )
+            | list
+            if k3s_gitlab_runner_tshirt_enabled | bool
+            else []
+          }}
+
+    - name: Initialize runner lifecycle state
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_desired_descriptions: []
+        k3s_gitlab_runner_desired_api_instance_names: >-
+          {{ k3s_gitlab_runner_tshirt_runners | map(attribute='key') | list }}
+        k3s_gitlab_runner_supplied_instance_descriptions: []
+        k3s_gitlab_runner_effective_description_prefix: >-
+          {{
+            k3s_gitlab_runner_description_prefix
+            if k3s_gitlab_runner_description_prefix | length > 0
+            else 'k8s-runner-'
+          }}
+        k3s_gitlab_runner_instance_runners: []
+        k3s_gitlab_runner_prefixed_instance_runners: []
+        k3s_gitlab_runner_owned_instance_runners: []
+        k3s_gitlab_runner_reset_instance_runners: []
+        k3s_gitlab_runner_stale_instance_runners: []
+        k3s_gitlab_runner_reset_removed_count: 0
+        k3s_gitlab_runner_pruned_count: 0
+        k3s_gitlab_runner_summary_records: []
+        k3s_gitlab_runner_selected_tshirt_sizes: >-
+          {{ k3s_gitlab_runner_tshirt_runners | map(attribute='key') | list }}
+        k3s_gitlab_runner_excluded_tshirt_sizes: >-
+          {{
+            (
+              k3s_gitlab_runner_tshirt_sizes | dict2items
+              | rejectattr(
+                'value.min_node_mb',
+                'le',
+                k3s_gitlab_runner_eligibility_memory_mb | int
+              )
+              | map(attribute='key') | list
+            )
+            if k3s_gitlab_runner_tshirt_enabled | bool
+            else []
+          }}
+
+    - name: Track desired custom API-managed instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_desired_api_instance_names: >-
+          {{ k3s_gitlab_runner_desired_api_instance_names + [item.name] }}
+      loop: "{{ k3s_gitlab_runner_config_list }}"
+      when:
+        - item.token is not defined
+        - item.runner_type | default('instance_type') == 'instance_type'
+
+    - name: Protect desired supplied-token instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_supplied_instance_descriptions: >-
+          {{
+            k3s_gitlab_runner_supplied_instance_descriptions
+            + [
+              k3s_gitlab_runner_description_prefix
+              + (item.description | default(item.name))
+            ]
+          }}
+      loop: "{{ k3s_gitlab_runner_config_list }}"
+      when:
+        - item.token is defined
+        - item.runner_type | default('instance_type') == 'instance_type'
+
+    - name: Require GitLab API credentials for lifecycle operations
+      ansible.builtin.assert:
+        that:
+          - k3s_gitlab_runner_admin_token | default('') | length > 0
+        fail_msg: >-
+          Managed instance cleanup and reset require
+          k3s_gitlab_runner_admin_token.
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Read first GitLab instance runner page
+      ansible.builtin.uri:
+        url: >-
+          {{ k3s_gitlab_runner_gitlab_external_url
+             }}/api/v4/runners/all?type=instance_type&per_page=100&page=1
+        method: GET
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        status_code: 200
+      register: k3s_gitlab_runner_instance_page_one
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Validate GitLab instance runner pagination
+      ansible.builtin.assert:
+        that:
+          - k3s_gitlab_runner_instance_page_one.json is sequence
+          - k3s_gitlab_runner_instance_page_one.json is not mapping
+          - k3s_gitlab_runner_instance_page_one.x_total_pages is defined
+          - >-
+            (k3s_gitlab_runner_instance_page_one.x_total_pages | string)
+            is match('^[1-9][0-9]*$')
+        fail_msg: GitLab instance runner pagination metadata is incomplete.
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Read remaining GitLab instance runner pages
+      ansible.builtin.uri:
+        url: >-
+          {{ k3s_gitlab_runner_gitlab_external_url
+             }}/api/v4/runners/all?type=instance_type&per_page=100&page={{ item }}
+        method: GET
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        status_code: 200
+      loop: >-
+        {{
+          range(
+            2,
+            (
+              k3s_gitlab_runner_instance_page_one.x_total_pages
+              | default(1) | int
+            ) + 1
+          ) | list
+        }}
+      register: k3s_gitlab_runner_additional_instance_pages
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Validate remaining GitLab instance runner pages
+      ansible.builtin.assert:
+        that:
+          - item.json is sequence
+          - item.json is not mapping
+        fail_msg: A GitLab instance runner page did not contain a list.
+      loop: "{{ k3s_gitlab_runner_additional_instance_pages.results | default([]) }}"
+      when:
+        - not (item.skipped | default(false))
+      no_log: true
+
+    - name: Collect GitLab instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_instance_runners: >-
+          {{
+            k3s_gitlab_runner_instance_page_one.json | default([])
+            + (
+              k3s_gitlab_runner_additional_instance_pages.results | default([])
+              | selectattr('json', 'defined')
+              | map(attribute='json') | flatten | list
+            )
+          }}
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Select prefixed GitLab instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_prefixed_instance_runners: >-
+          {{
+            k3s_gitlab_runner_instance_runners
+            | selectattr('runner_type', 'equalto', 'instance_type')
+            | selectattr('description', 'defined')
+            | selectattr('description', 'string')
+            | selectattr(
+              'description',
+              'match',
+              '^' ~ (k3s_gitlab_runner_effective_description_prefix | regex_escape)
+            )
+            | list
+          }}
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Read prefixed GitLab instance runner details
+      ansible.builtin.uri:
+        url: >-
+          {{
+            k3s_gitlab_runner_gitlab_external_url
+            ~ '/api/v4/runners/'
+            ~ item.id
+          }}
+        method: GET
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        status_code: 200
+      loop: "{{ k3s_gitlab_runner_prefixed_instance_runners }}"
+      register: k3s_gitlab_runner_prefixed_instance_details
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Validate prefixed GitLab instance runner details
+      ansible.builtin.assert:
+        that:
+          - item.json is mapping
+          - item.json.id is defined
+        fail_msg: A GitLab instance runner detail response was malformed.
+      loop: >-
+        {{ k3s_gitlab_runner_prefixed_instance_details.results | default([]) }}
+      when:
+        - not (item.skipped | default(false))
+      no_log: true
+
+    - name: Collect managed GitLab instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_owned_instance_runners: >-
+          {{
+            k3s_gitlab_runner_prefixed_instance_details.results | default([])
+            | selectattr('json', 'defined')
+            | map(attribute='json')
+            | selectattr('runner_type', 'equalto', 'instance_type')
+            | selectattr('tag_list', 'defined')
+            | selectattr('tag_list', 'sequence')
+            | selectattr(
+              'tag_list',
+              'contains',
+              k3s_gitlab_runner_management_tag
+            )
+            | list
+          }}
+      when:
+        - k3s_gitlab_runner_prune_stale_enabled | bool
+          or k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Select managed GitLab instance runners for reset
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_reset_instance_runners: >-
+          {{
+            k3s_gitlab_runner_owned_instance_runners
+            | rejectattr(
+              'description',
+              'in',
+              k3s_gitlab_runner_supplied_instance_descriptions
+            )
+            | list
+          }}
+      when: k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Clear saved values for managed instance reset
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item }}/values.yaml"
+        state: absent
+      loop: "{{ k3s_gitlab_runner_desired_api_instance_names }}"
+      when: k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Remove managed GitLab instance runners for reset
+      ansible.builtin.uri:
+        url: >-
+          {{ k3s_gitlab_runner_gitlab_external_url
+             }}/api/v4/runners/{{ item.id }}
+        method: DELETE
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        status_code: 204
+      loop: "{{ k3s_gitlab_runner_reset_instance_runners }}"
+      when: k3s_gitlab_runner_reset_managed_instance_runners | bool
+      no_log: true
+
+    - name: Record managed instance reset count
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_reset_removed_count: >-
+          {{ k3s_gitlab_runner_reset_instance_runners | length }}
+        k3s_gitlab_runner_instance_runners: >-
+          {{
+            k3s_gitlab_runner_instance_runners
+            | rejectattr(
+              'id',
+              'in',
+              k3s_gitlab_runner_reset_instance_runners
+              | map(attribute='id') | list
+            )
+            | list
+          }}
+      when: k3s_gitlab_runner_reset_managed_instance_runners | bool
+
+    - name: Apply PriorityClass for eligible large runners
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        definition: "{{ lookup('template', 'priority-class.yml.j2') | from_yaml }}"
+      when: >-
+        k3s_gitlab_runner_tshirt_runners
+        | selectattr('key', 'in', ['l', 'xl', 'xxl'])
+        | list
+        | length > 0
 
     # --- All runners (t-shirt + custom) ---
-    - name: "register and deploy all runners"
+    - name: Register and deploy all runners
       ansible.builtin.include_tasks: register.yml
-      loop: "{{ (k3s_gitlab_runner_tshirt_sizes | dict2items | list) + k3s_gitlab_runner_config_list }}"
+      loop: "{{ k3s_gitlab_runner_tshirt_runners + k3s_gitlab_runner_config_list }}"
       loop_control:
         loop_var: runner_item
+
+    - name: Select stale managed GitLab instance runners
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_stale_instance_runners: >-
+          {{
+            k3s_gitlab_runner_owned_instance_runners
+            | rejectattr(
+              'description',
+              'in',
+              k3s_gitlab_runner_desired_descriptions
+            )
+            | list
+            if (
+              k3s_gitlab_runner_prune_stale_enabled | bool
+              and not k3s_gitlab_runner_reset_managed_instance_runners | bool
+            )
+            else []
+          }}
+
+    - name: Remove stale managed GitLab runners
+      ansible.builtin.uri:
+        url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ item.id }}"
+        method: DELETE
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_runner_admin_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+        status_code: 204
+      loop: "{{ k3s_gitlab_runner_stale_instance_runners }}"
+      no_log: true
+
+    - name: Record stale managed runner count
+      ansible.builtin.set_fact:
+        k3s_gitlab_runner_pruned_count: >-
+          {{ k3s_gitlab_runner_stale_instance_runners | length }}
+
+    - name: Show K3s GitLab runner deployment summary
+      ansible.builtin.debug:
+        msg:
+          cluster:
+            schedulable_nodes: "{{ k3s_gitlab_runner_schedulable_node_count }}"
+            manager_replicas: "{{ k3s_gitlab_runner_manager_replicas_effective }}"
+          sizing:
+            tshirt_enabled: "{{ k3s_gitlab_runner_tshirt_enabled | bool }}"
+            observed_memory_mb: "{{ k3s_gitlab_runner_minimum_node_memory_mb }}"
+            eligibility_memory_mb: "{{ k3s_gitlab_runner_eligibility_memory_mb }}"
+            fixed_allowance_mb: >-
+              {{ k3s_gitlab_runner_tshirt_memory_fixed_allowance_mb }}
+            tolerance_pct: "{{ k3s_gitlab_runner_tshirt_memory_tolerance_pct }}"
+            selected: "{{ k3s_gitlab_runner_selected_tshirt_sizes }}"
+            excluded: "{{ k3s_gitlab_runner_excluded_tshirt_sizes }}"
+          lifecycle:
+            cleanup_enabled: "{{ k3s_gitlab_runner_prune_stale_enabled | bool }}"
+            pruned: "{{ k3s_gitlab_runner_pruned_count }}"
+            reset_enabled: >-
+              {{ k3s_gitlab_runner_reset_managed_instance_runners | bool }}
+            reset_removed: "{{ k3s_gitlab_runner_reset_removed_count }}"
+          features:
+            health_checks: "{{ k3s_gitlab_runner_health_check_enabled | bool }}"
+            ephemeral_storage: >-
+              {{ k3s_gitlab_runner_ephemeral_storage_enabled | bool }}
+            metrics: "{{ k3s_gitlab_runner_metrics_enabled | bool }}"
+            service_monitor: >-
+              {{ k3s_gitlab_runner_service_monitor_enabled | bool }}
+          totals:
+            runners: "{{ k3s_gitlab_runner_summary_records | length }}"
+            created: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('identity', 'equalto', 'created')
+                | list | length
+              }}
+            reused: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('identity', 'equalto', 'reused')
+                | list | length
+              }}
+            rotated: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('identity', 'equalto', 'rotated')
+                | list | length
+              }}
+            supplied: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('identity', 'equalto', 'supplied')
+                | list | length
+              }}
+            initial: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('configuration', 'equalto', 'initial')
+                | list | length
+              }}
+            updated: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('configuration', 'equalto', 'updated')
+                | list | length
+              }}
+            forced: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('configuration', 'equalto', 'forced')
+                | list | length
+              }}
+            unchanged: >-
+              {{
+                k3s_gitlab_runner_summary_records
+                | selectattr('configuration', 'equalto', 'unchanged')
+                | list | length
+              }}
+          runners: "{{ k3s_gitlab_runner_summary_records }}"

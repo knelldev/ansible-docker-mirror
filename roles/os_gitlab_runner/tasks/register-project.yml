@@ -7,8 +7,8 @@
     status_code: 200
     body_format: json
     headers:
-          Content-Type: application/json
-          Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token  }}"
+      Content-Type: application/json
+      Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token  }}"
   register: gitlab_existing_projects
 
 - name: Concatenate a list to string
@@ -17,7 +17,7 @@
   vars:
     query: "[?name=='{{ runner_item.registration.name }}'].id | [0]"
 
-- name: reset project token and grab token
+- name: Reset project token and grab token
   uri:
     url: "{{ gitlab_url }}/api/v4/projects/{{ gitlab_project_id }}/runners/reset_registration_token"
     method: POST
@@ -25,11 +25,11 @@
     status_code: 200,201
     body_format: json
     headers:
-        Content-Type: application/json
-        Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token }}"
+      Content-Type: application/json
+      Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token }}"
   register: gitlab_project_token
 
-- name: register project gitlab runner
+- name: Register project gitlab runner
   shell: |
     gitlab-runner register \
     --non-interactive \

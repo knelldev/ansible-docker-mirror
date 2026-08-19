@@ -1,37 +1,37 @@
 ---
-- name: "block for become=true"
+- name: Block for become=true
   when: os_k3s_install and os_k3s_server and os_k3s_namespace_create
   become: true
   block:
-    - name: "ensure pip"
+    - name: Ensure pip
       ansible.builtin.package:
         name: python3-pip
         state: present
 
-    - name: "install needed pip packages"
+    - name: Install needed pip packages
       ansible.builtin.pip:
         name: "{{ os_k3s_pip_packages }}"
         break_system_packages: true
 
-    - name: Create a k8s namespace
-      ansible.builtin.k8s:
+    - name: Create a K3s namespace
+      kubernetes.core.k8s:
         name: "{{ os_k3s_namespace | lower }}"
         api_version: v1
         kind: Namespace
         state: present
         kubeconfig: /etc/rancher/k3s/k3s.yaml
 
-    - name: "sa-block"
+    - name: Sa-block
       when: os_k3s_serviceaccount_create
       block:
-        - name: "Template k3s-rbac.yaml"
+        - name: Template k3s-rbac.yaml
           ansible.builtin.template:
             src: "k3s-rbac.yaml.j2"
             dest: "/tmp/k3s-rbac.yaml"
             mode: "0644"
 
-        - name: "Create a K3S Objects by reading the definition from a file"
-          ansible.builtin.k8s:
+        - name: Create K3s objects from the definition file
+          kubernetes.core.k8s:
             state: present
             src: /tmp/k3s-rbac.yaml
             kubeconfig: /etc/rancher/k3s/k3s.yaml
@@ -44,7 +44,7 @@
         #   ansible.builtin.debug:
         #     msg: "ServiceAccount Token: {{ sa_token.stdout }}"
 
-        - name: "Remove k3s-rbac.yaml"
+        - name: Remove k3s-rbac.yaml
           ansible.builtin.file:
             path: /tmp/k3s-rbac.yaml
             state: absent

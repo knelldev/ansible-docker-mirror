@@ -2,7 +2,8 @@
 # Default Values for Role - Might contain placeholders for passwords - NOT live
 ###############################################################################
 ---
-storage_base_path: /data # noqa var-naming[no-role-prefix]
+storage_base_path: /data
+storage_base_path_win: C:\\data # noqa var-naming[no-role-prefix]
 
 http: # noqa var-naming[no-role-prefix]
   retries: 40

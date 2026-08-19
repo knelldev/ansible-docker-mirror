@@ -5,7 +5,7 @@
 ##############################################################################
 ---
 # Pre-flight: catch any __REQUIRED__ sentinel values for this role
-- name: (main.yml) Check for unconfigured mandatory variables
+- name: Check for unconfigured mandatory variables
   vars:
     _varnames: "{{ q('ansible.builtin.varnames', '^' + role_name + '_') }}"
     _missing: >-
@@ -23,7 +23,7 @@
   when: _missing | length > 0
 
 # Load additional OS specific configuration from vars folder
-- name: (main.yml) Load vars for os if available
+- name: Load vars for os if available
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
@@ -34,7 +34,7 @@
       skip: true
 
 # Include numbered task files in ascending order (##-name.yml pattern)
-- name: (main.yml) Include tasks
+- name: Include tasks
   ansible.builtin.include_tasks: "{{ item }}"
   loop: "{{ q('fileglob', role_path + '/tasks/[0-9][0-9]-*.yml') | sort }}"
   loop_control:

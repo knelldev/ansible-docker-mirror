@@ -1,0 +1,21 @@
+---
+schema: spec-driven
+
+context: |
+  This repository ships Ansible automation as a rootless container image.
+  Read AGENTS.md and applicable child AGENTS.md before editing.
+  Read TECHSTACK.md for technical constraints.
+  Keep OpenSpec artifacts limited to behavior changes and execution evidence.
+  Verify uncertain facts against repository evidence or authoritative sources.
+
+rules:
+  proposal:
+    - State outcome, scope, exclusions, risks, simpler alternatives considered, and explicit approval status.
+  design:
+    - Link to relevant technical constraints and architecture decisions.
+  specs:
+    - State observable requirements and scenarios.
+  tasks:
+    - Record status, blockers, verification evidence, next action, and any approved scope change.
+githubCopilot:
+  cloudAgent: false

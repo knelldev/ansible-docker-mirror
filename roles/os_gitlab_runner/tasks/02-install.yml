@@ -3,29 +3,29 @@
   get_url:
     url: "{{ gitlab_runner_download_url }}"
     dest: "{{ gitlab_runner_bin_path }}"
-    mode: 0755
+    mode: "0755"
 
 - name: Check for existing runner installation
   stat:
     path: /etc/systemd/system/gitlab-runner.service
   register: runner_result
 
-- name: install gitlab runner
+- name: Install gitlab runner
   shell: |
     gitlab-runner install --user={{ gitlab_runner_user }} --working-directory={{ gitlab_runner_base_path }}
   when: not runner_result.stat.exists
 
-- name: start gitlab runner
+- name: Start gitlab runner
   shell: |
     sudo gitlab-runner start
   when: not runner_result.stat.exists
 
-- name: install gitlab runner
+- name: Install gitlab runner
   shell: |
     gitlab-runner list
   register: runner_list
 
-- name: include register loop
+- name: Include register loop
   block:
     - include_tasks: register.yml
       loop: "{{ gitlab_runner_list }}"
@@ -33,6 +33,6 @@
         loop_var: runner_item
   become: yes
 
-- name: restart all gitlab runners
+- name: Restart all gitlab runners
   shell: |
     gitlab-runner restart

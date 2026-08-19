@@ -1,5 +1,5 @@
 ---
-- name: reset and grab token
+- name: Reset and grab token
   uri:
     url: "{{ gitlab_url }}/api/v4/runners/reset_registration_token"
     method: POST
@@ -7,11 +7,11 @@
     status_code: 200,201
     body_format: json
     headers:
-        Content-Type: application/json
-        Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token }}"
+      Content-Type: application/json
+      Authorization: "Bearer {{ gitlab_admin_access_token.json.access_token }}"
   register: gitlab_shared_token
 
-- name: register shared gitlab runner
+- name: Register shared gitlab runner
   shell: |
     gitlab-runner register \
     --non-interactive \

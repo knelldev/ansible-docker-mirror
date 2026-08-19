@@ -1,19 +1,19 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) stat key.env"
+    - name: Stat key.env
       ansible.builtin.stat:
         path: "{{ app_path }}/key.env"
       register: register_key_exists
 
-    - name: "({{ task_filename }}) generate encryption key"
+    - name: Generate encryption key
       ansible.builtin.shell: head -c32 /dev/urandom | base64
       changed_when: false
       register: register_key_created
       when: not register_key_exists.stat.exists
 
-    - name: "({{ task_filename }}) Create key.env"
+    - name: Create key.env
       ansible.builtin.copy:
         dest: "{{ app_path }}/key.env"
         mode: "0600"
@@ -23,7 +23,7 @@
           SEMAPHORE_ACCESS_KEY_ENCRYPTION={{ register_key_created.stdout }}
       when: not register_key_exists.stat.exists
 
-    - name: "({{ task_filename }}) Template {{ app_name }} files"
+    - name: Template {{ app_name }} files
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -37,7 +37,7 @@
         - src: quadlet-semaphore.container.j2
           dest: /etc/containers/systemd/semaphore.container
 
-    - name: "({{ task_filename }}) Template {{ app_name }} network"
+    - name: Template {{ app_name }} network
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -47,7 +47,7 @@
           dest: /etc/containers/systemd/{{ con_semaphore_container_network_name }}.network
       when: con_semaphore_container_network_create
 
-    - name: "({{ task_filename }}) Create a symbolic links for container services"
+    - name: Create a symbolic links for container services
       ansible.builtin.file:
         src: "/etc/containers/systemd/{{ item }}"
         dest: "{{ app_path }}/quadlet-{{ item }}"
@@ -57,13 +57,13 @@
         - "semaphore_postgres.container"
         - "{{ con_semaphore_container_network_name }}.network"
 
-    - name: "({{ task_filename }}) start semaphore quadlet"
+    - name: Start semaphore quadlet
       ansible.builtin.systemd_service:
         state: "{{ con_semaphore_systemd_service_state }}"
         daemon_reload: true
         name: semaphore
 
-    - name: "({{ task_filename }}) Ensure Application is started and accepting connections"
+    - name: Ensure Application is started and accepting connections
       ansible.builtin.uri:
         url: "{{ con_semaphore_url }}"
         return_content: true

@@ -1,83 +1,121 @@
-# DOX framework
+# DOX
 
-- DOX is highly performant AGENTS.md hierarchy installed here
-- Agent must follow DOX instructions across any edits
+## Purpose
+
+- Defines how contributors and AI agents navigate, change, and verify this repository.
 
 ## Core Contract
 
-- AGENTS.md files are binding work contracts for their subtrees
-- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable AGENTS.md plus every parent AGENTS.md above it
+- Read this file and every applicable child `AGENTS.md` before editing.
+- Read applicable `.github/instructions/*.instructions.md` before editing matching source files.
+- The nearest `AGENTS.md` owns local contracts; it cannot weaken this file.
+- Keep contracts concise, operational, and free of session history.
+- Update the nearest `AGENTS.md` only when its durable contract changes.
 
-## Read Before Editing
+## Change Records
 
-1. Read the root AGENTS.md
-2. Identify every file or folder you expect to touch
-3. Walk from the repository root to each target path
-4. Read every AGENTS.md found along each route
-5. If a parent AGENTS.md lists a child AGENTS.md whose scope contains the path, read that child and continue from there
-6. Use the nearest AGENTS.md as the local contract and parent docs for repo-wide rules
-7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
+- `TECHSTACK.md` owns verified runtime, dependency, and quality facts.
+- `openspec/specs/` owns accepted technical behavior.
+- `openspec/changes/<change-id>/` owns active proposals, designs, tasks, blockers, and verification evidence.
+- `docs/decisions/` owns cross-cutting architecture decisions.
+- `.ai/recovery/` owns temporary unsafe-state handoffs; `.ai/cache/` and `.ai/scratch/` are ignored.
+- Do not duplicate these records in a separate memory or task bank.
 
-Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
+## Approval Boundary
 
-## Update After Editing
+- Work explicitly requested and bounded by an existing contract may proceed.
+- Ask before adding behavior, dependencies, external services, roles, migrations, security-sensitive changes, or work outside an approved OpenSpec change.
+- Use OpenSpec before approved changes that alter behavior across components, integrate external APIs, or change compatibility.
+- For OpenSpec-required work, present the proposal and plan for approval before implementation.
+- An OpenSpec change is executable only when its proposal records explicit approval and its required planning artifacts are complete.
+- One approved plan is primary. Multiple named plans may run together when explicitly approved; record their shared scope and validation in each plan.
+- Within approved scope, continue without repeated approval prompts. Stop when scope materially changes.
 
-Every meaningful change requires a DOX pass before the task is done.
+## Execution Boundary
 
-Update the closest owning AGENTS.md when a change affects:
+Plan initialization is planning only. Report once:
 
-- purpose, scope, ownership, or responsibilities
-- durable structure, contracts, workflows, or operating rules
-- required inputs, outputs, permissions, constraints, side effects, or artifacts
-- user preferences about behavior, communication, process, organization, or quality
-- AGENTS.md creation, deletion, move, rename, or index contents
+- `Plan`: change ID and purpose.
+- `Readiness`: planning artifacts and current task status.
+- `Approval`: needed, granted, or scope decision needed.
+- `Tasks`: concise list of pending tasks and their intended order.
+- `Recommended next task`: the smallest task that can proceed.
 
-Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
+After plan initialization, ask once for confirmation to execute the selected
+plan and listed tasks. Do not edit until that confirmation is granted.
 
-## Hierarchy
+Before implementing the confirmed plan, publish its only compact plan-start record:
 
-- Root AGENTS.md is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index
-- Child AGENTS.md files own domain-specific instructions and their own Child DOX Index
-- Each parent explains what its direct children cover and what stays owned by the parent
-- The closer a doc is to the work, the more specific and practical it must be
+- `Plan`: change ID and state in brackets, with task progress when applicable.
+- `DOX`: applicable `AGENTS.md` chain only when it clarifies the execution scope.
 
-## Child Doc Shape
+Then state `Goal`, `Approach`, and `Validation`. Do not include authority. Keep
+off-task notes to the smallest useful information.
 
-- Create a child AGENTS.md when a folder becomes a durable boundary with its own purpose, rules, responsibilities, workflow, materials, or quality standards
-- Work Guidance must reflect the current standards of the project or user instructions; if there are no specific standards or instructions yet, leave it empty
-- Verification must reflect an existing check; if no verification framework exists yet, leave it empty and update it when one exists
+During the confirmed plan, report only a material result, a changed assumption,
+a blocker with the proposed resolution, or an off-chain proposal that asks for
+approval. Do not report minor task progress while the goal and side effects are
+unchanged. Do not repeat known plan, task, DOX, or validation information.
 
-Default section order:
-- Purpose
-- Ownership
-- Local Contracts
-- Work Guidance
-- Verification
-- Child DOX Index
+Do not edit until the work contract identifies bounded authority. Stop and
+ask before continuing when an edit, test, or validation would:
 
-## Style
+- touch an unapproved or non-active change;
+- change an approved requirement, design, risk, compatibility promise, or task;
+- require an unapproved external system, credential, dependency, privilege, or destructive action; or
+- reveal that the active plan is incomplete or incorrect.
 
-- Keep docs concise, current, and operational
-- Document stable contracts, not diary entries
-- Put broad rules in parent docs and concrete details in child docs
-- Prefer direct bullets with explicit names
-- Do not duplicate rules across many files unless each scope needs a local version
-- Delete stale notes instead of explaining history
-- Trim obvious statements, repeated rules, misplaced detail, and warnings for risks that no longer exist
+For off-chain work or a material task-scope change, report only what differs,
+the affected scope, and the decision needed. Ask for approval before proceeding.
+Minor implementation details within the approved result do not need reapproval.
 
-## Closeout
+When a task finishes, update its OpenSpec status and verification evidence. Report
+only a concise implementation result or blocker with relevant evidence and a
+decision request. At plan validation, present a table before
+changed-file references that states each file and the change it carries.
+When every task finishes, request confirmation that the result matches the
+expected outcome. After approval, perform DOX closeout, update durable records,
+sync or archive the change, and report the clean-state checklist and next work.
 
-1. Re-check changed paths against the DOX chain
-2. Update nearest owning docs and any affected parents or children
-3. Refresh every affected Child DOX Index
-4. Remove stale or contradictory text
-5. Run existing verification when relevant
-6. Report any docs intentionally left unchanged and why
+## Work Guidance
 
-## User Preferences
-
-When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
+- Prefer the smallest correct change. Do not invent features or abstractions.
+- Start by establishing the requested outcome, applicable contracts, and the smallest safe path. Use OpenSpec when the approval boundary requires a written plan.
+- Keep conversation concise: outcome, affected paths, verification, blocker. Use a changed-files table only at plan validation; do not add repeated progress messages.
+- Order output for scanning: urgent blocker, failed validation, decision, or
+  required user action first; then the current result; then only the stable
+  context needed to decide or verify. Omit static context that adds no value.
+- Label every completion report as either `Result` (a requested change or decision) or `Validation` (evidence without a behavior change).
+- For substantial work, end the final report with a compact standalone `Summary` that begins with exactly one visual state: `🟢 Clear`, `🟡 Follow-up`, or `🔴 Blocked`. Include result, changed paths, completed checks, records updated, open or unexpected points, and one `Next` action. Use bullets or a compact checklist by default; do not force a table. Do not use it for plan initialization or short replies.
+- Put the `Summary` first when it contains all useful completion information. Add details before it only when they materially help a reader understand or verify the result.
+- Use `🟢 Clear` only when requested work, relevant checks, and required records are complete with no open point. Use `🟡 Follow-up` when usable work has an explicit remaining check, decision, or task. Use `🔴 Blocked` when work needs a decision, approval, credential, or external dependency before it can continue.
+- `Next` must be one actionable step, or `None` only when the current plan is complete and needs no archive, sync, or follow-up action.
+- `git diff --check` is a patch-hygiene check for whitespace errors that can
+  obscure review or break patch application; it does not validate runtime behavior.
+- For validation commands and repository scripts, print one copyable outcome
+  line before detailed evidence. Reuse that line in the final summary when it
+  remains accurate.
+- Recommend compaction or a fresh session when the current workstream is complete or the conversation context is becoming costly; preserve the handoff in the canonical OpenSpec or recovery record first.
+- Check facts that affect the requested result against repository evidence or authoritative sources. For unrelated details such as loop items, leave them unchanged unless they block the work or reveal a problem; then ask before expanding scope.
+- Do not infer requirements, APIs, versions, or behavior from names, conventions, or stale documentation. Inspect source, configuration, tests, or authoritative documentation when the fact affects the requested result.
+- Challenge an approach only when a simpler or safer alternative materially reduces risk, complexity, or maintenance.
+- Record completed OpenSpec tasks and verification evidence as work progresses.
+- Before closeout, re-read the applicable DOX chain, update affected durable contracts, run relevant checks, and report intentional verification gaps.
+- Run relevant configured checks. State unrun checks and reasons.
+- Before validation, proportionally review requirement coverage, relevant
+  repository evidence or authoritative best practices, simpler safe alternatives,
+  gaps, regressions, and side effects. Correct in-scope findings; request
+  approval for material changes.
+- Before sending a substantial final report, remove filler, repeated plan
+  context, stale information, and detail that does not help the user decide or
+  verify the result.
+- Recommend an improvement only when its concrete benefit outweighs added
+  distraction or maintenance. State the benefit and request approval before
+  expanding scope or changing behavior.
 
 ## Child DOX Index
 
-This project is not yet indexed. Before continuing you must scan the project, build the DOX tree and replace this message with the actual index. Go deep and scan files recursively to properly evaluate complexity and create nested DOX files where needed.
+- **.ai/** - Temporary AI research and recovery records.
+- **callback_plugins/** - Repository-local Ansible callback plugins and output contracts.
+- **docs/** - Durable human-facing project documentation and architecture decisions.
+- **roles/** - Ansible role contracts and local verification.
