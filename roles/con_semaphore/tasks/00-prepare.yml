@@ -1,8 +1,8 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) Create {{ app_name }} dirs"
+    - name: Create {{ app_name }} dirs
       ansible.builtin.file:
         path: "{{ app_path }}/{{ item.name }}"
         state: directory

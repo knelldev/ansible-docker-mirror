@@ -1,8 +1,8 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+- name: Block for become=true
   become: true
   block:
-    - name: "({{ task_filename }}) Template gitlab files"
+    - name: Template gitlab files
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
@@ -11,7 +11,7 @@
         - src: docker-compose.yml.j2
           dest: "{{ con_watchtower_path }}/docker-compose.yml"
 
-    - name: "({{ task_filename }}) Create and start watchtower"
+    - name: Create and start watchtower
       ansible.builtin.shell: docker compose up -d --force-recreate
       args:
         chdir: "{{ con_watchtower_path }}"

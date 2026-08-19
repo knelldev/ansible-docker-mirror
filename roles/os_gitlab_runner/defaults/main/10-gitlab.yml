@@ -93,5 +93,3 @@ gitlab_runner_list:
     run_untagged: "true"
     locked: "false"
     protected: "not_protected"
-
-

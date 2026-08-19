@@ -11,19 +11,59 @@ k3s_gitlab_runner_gitlab_external_url: "{{ con_gitlab_external_url }}"
 k3s_gitlab_runner_namespace_create: true
 k3s_gitlab_runner_namespace: "gitlab-runner"
 k3s_gitlab_runner_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+k3s_gitlab_runner_helm_binary_path: /usr/local/bin/helm
 
 # Runner settings
 k3s_gitlab_runner_concurrent: 50
 k3s_gitlab_runner_poll_timeout: 600
+k3s_gitlab_runner_run_untagged: true
+
+# Managed runner identity and optional GitLab cleanup
+k3s_gitlab_runner_management_tag: ansible
+# Keep empty for compatibility with existing custom runner descriptions. Set a
+# prefix explicitly to include managed custom runners in lifecycle operations.
+k3s_gitlab_runner_description_prefix: ""
+# Generated T-shirt runners converge by default. Set false to retain stale ones.
+k3s_gitlab_runner_prune_stale_enabled: "{{ k3s_gitlab_runner_tshirt_enabled }}"
+# One-shot destructive reset for role-owned instance runners. Disable after use.
+k3s_gitlab_runner_reset_managed_instance_runners: false
+
+# Deployment health
+k3s_gitlab_runner_helm_wait: true
+k3s_gitlab_runner_helm_timeout: "10m"
+k3s_gitlab_runner_health_check_enabled: true
+k3s_gitlab_runner_health_check_retries: 12
+k3s_gitlab_runner_health_check_delay: 10
+k3s_gitlab_runner_failure_log_lines: 200
+
+# Runner manager availability. Automatic mode uses one replica on one node and
+# two replicas on clusters with at least two schedulable nodes.
+k3s_gitlab_runner_manager_replicas_auto: true
+k3s_gitlab_runner_manager_replicas: null
+k3s_gitlab_runner_manager_replicas_max: 2
+k3s_gitlab_runner_manager_pdb_enabled: true
+
+# Optional runner-manager metrics
+k3s_gitlab_runner_metrics_enabled: false
+k3s_gitlab_runner_service_monitor_enabled: false
+k3s_gitlab_runner_metrics_port: 9252
+
+# Optional ephemeral storage protection for job pods.
+k3s_gitlab_runner_ephemeral_storage_enabled: false
+k3s_gitlab_runner_ephemeral_storage_buffer_min_gib: 20
+k3s_gitlab_runner_ephemeral_storage_buffer_pct: 20
 
 # Hook scripts (pre/post build resource monitoring)
 # Set to false to disable hook scripts and hostpath volume mount
 k3s_gitlab_runner_hooks_enabled: true
+k3s_gitlab_runner_hook_sample_interval_seconds: 5
+k3s_gitlab_runner_hook_memory_upgrade_threshold_pct: 80
+k3s_gitlab_runner_hook_memory_downgrade_threshold_pct: 40
 
 ###############################################################################
 # T-Shirt sized runners (auto-registered via GitLab API)
 ###############################################################################
-# Requires: k3s_gitlab_runner_admin_token (GitLab admin API token, from vault)
+# Requires: a vault-provided API token with GitLab's `create_runner` scope.
 # Requires: GitLab >= 17.0
 # Sizes and limits are calculated automatically based on cluster resources.
 # Size definitions are in vars/main.yml (not user-changeable).
@@ -31,11 +71,8 @@ k3s_gitlab_runner_tshirt_enabled: true
 # k3s_gitlab_runner_admin_token: ""  # Required when tshirt_enabled or custom runners without token
 
 # Resource calculation settings
-k3s_gitlab_runner_system_reserved_mb: 2048  # Memory reserved for system/k3s
-k3s_gitlab_runner_small_pool_pct: 50        # % of usable memory for xs/s/m (rest for l/xl/xxl)
-
-# Optional: drain runners before update (wait for active jobs to finish)
-k3s_gitlab_runner_drain_before_update: false
+k3s_gitlab_runner_system_reserved_mb: 2048 # Memory reserved for system/k3s
+k3s_gitlab_runner_small_pool_pct: 50 # % of usable memory for xs/s/m (rest for l/xl/xxl)
 
 # Global force_reinstall flag - can be overridden per runner
 k3s_gitlab_runner_force_reinstall: false
@@ -43,10 +80,13 @@ k3s_gitlab_runner_force_reinstall: false
 ###############################################################################
 # Custom runners
 ###############################################################################
-# If token is omitted, the admin token is used to auto-register the runner.
+# If token is omitted, api_token or the admin token is used to auto-register the runner.
 # Each item supports:
 #   name:          (required) Helm release name and runner name
-#   token:         (optional) Runner token. If omitted, auto-registered via admin API
+#   api_token:     (optional) GitLab API token for auto-registration. If omitted, admin token is used.
+#                  Required when not using k3s_gitlab_runner_admin_token
+#   token:         (optional) Runner authentication token. When provided, skips all API operations
+#                  and goes straight to Helm deployment.
 #   gitlab_url:    (optional) Override GitLab URL (default: k3s_gitlab_runner_gitlab_external_url)
 #   concurrent:    (optional) Override max concurrent jobs (default: k3s_gitlab_runner_concurrent)
 #   image:         (optional) Default container image (default: python:3)
@@ -65,41 +105,11 @@ k3s_gitlab_runner_force_reinstall: false
 #   project_id:    (optional) GitLab project ID (required when runner_type is "project_type")
 #   tags:          (optional) Comma-separated tags for the runner
 #   description:   (optional) Runner description shown in GitLab UI
-#   skip_healthcheck: (optional) Skip the health check after deployment (default: false)
 #   force_reinstall: (optional) Force Helm chart reinstall/update (default: false)
+#
+# Token handling:
+# - If `token` is provided: skips ALL API operations and goes straight to Helm deployment.
+# - If `api_token` is provided: uses that token for API registration, bypasses admin_token.
+# - If neither is provided: falls back to k3s_gitlab_runner_admin_token for auto-registration.
+# - If NO token is provided: the role fails before it changes the cluster.
 k3s_gitlab_runner_config_list: []
-# Example: Runner with manual token
-# - name: my-runner
-#   token: glrt-xxxxxxxxxxxx
-#   image: python:3
-#   concurrent: 10
-#   cache:
-#     server: "minio.example.com:9000"
-#     access_key: "ACCESS_KEY"
-#     secret_key: "SECRET_KEY"
-#     bucket: "gitlab-runner-cache"
-#     insecure: true
-#   extra_config: |
-#     [runners.kubernetes]
-#       cpu_request = "2"
-#       memory_request = "2Gi"
-#       memory_limit = "4Gi"
-#       node_selector_overwrite_allowed = ".*"
-#     [runners.kubernetes.node_selector]
-#       "kubernetes.io/os" = "linux"
-#
-# Example: Auto-registered instance runner (uses admin token)
-# - name: auto-runner
-#   description: "Auto-registered shared runner"
-#   tags: "docker,k8s,shared"
-#
-# Example: Group-scoped runner
-# - name: group-runner
-#   runner_type: group_type
-#   group_id: 42
-#   tags: "group-ci"
-#
-# Example: Custom runner with manual token (no admin token needed)
-# - name: custom-runner
-#   token: glrt-xxxxxxxxxxxx
-#   skip_healthcheck: true  # Skip health check if no admin token available

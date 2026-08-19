@@ -1,42 +1,49 @@
 ---
 app_name: "{{ role_name.split('_')[1:] | join('_') }}" # noqa var-naming[no-role-prefix]
 app_path: "{{ storage_base_path }}/{{ app_name }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ app_name | replace('_', '-') }}" # noqa var-naming[no-role-prefix]
 
 # T-Shirt size definitions (not user-changeable)
 # mem_request = mem_limit for guaranteed QoS
 # Tags are auto-generated as: docker-{size},k8s-{size},shared-{size}
-# min_node_mb: minimum node memory required to enable this size (0 = always)
+# min_node_mb: minimum node memory that leaves room for one runner after the
+# system reserve and the corresponding 50% capacity pool are applied.
+k3s_gitlab_runner_tshirt_memory_tolerance_pct: 5
+k3s_gitlab_runner_tshirt_memory_fixed_allowance_mb: 512
 k3s_gitlab_runner_tshirt_sizes:
   xs:
     memory_limit: "512Mi"
     memory_limit_mb: 512
     cpu_request: "250m"
-    min_node_mb: 0
+    min_node_mb: 3072
+    ephemeral_storage_limit: "5Gi"
   s:
     memory_limit: "1Gi"
     memory_limit_mb: 1024
     cpu_request: "500m"
-    min_node_mb: 0
+    min_node_mb: 4096
+    ephemeral_storage_limit: "10Gi"
   m:
     memory_limit: "2Gi"
     memory_limit_mb: 2048
     cpu_request: "1"
-    min_node_mb: 0
+    min_node_mb: 6144
+    ephemeral_storage_limit: "20Gi"
   l:
     memory_limit: "4Gi"
     memory_limit_mb: 4096
     cpu_request: "2"
-    min_node_mb: 0
+    min_node_mb: 10240
+    ephemeral_storage_limit: "30Gi"
   xl:
     memory_limit: "8Gi"
     memory_limit_mb: 8192
     cpu_request: "4"
-    min_node_mb: 24576
+    min_node_mb: 18432
+    ephemeral_storage_limit: "45Gi"
   xxl:
     memory_limit: "16Gi"
     memory_limit_mb: 16384
     cpu_request: "8"
-    min_node_mb: 32768
-
-# Minimum GitLab version required for runner auto-registration API
-k3s_gitlab_runner_min_gitlab_version: "17.0"
+    min_node_mb: 34816
+    ephemeral_storage_limit: "60Gi"

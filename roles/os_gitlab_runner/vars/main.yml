@@ -1,6 +1,7 @@
 ---
 app_name: "{{ role_name.split('_')[1] }}" # noqa var-naming[no-role-prefix]
 app_path: "{{ storage_base_path }}/{{ app_name }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ app_name | replace('_', '-') }}" # noqa var-naming[no-role-prefix]
 
 # Role variables come here
 gitlab_runner_download_url: https://gitlab-runner-downloads.s3.amazonaws.com/{{ gitlab_runner_version }}/binaries/gitlab-runner-linux-amd64

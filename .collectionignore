@@ -1,0 +1,49 @@
+# .dockerignore
+## ansible
+*.retry
+
+## macos
+.DS_store
+
+## vscode
+.vscode/*
+.github/**
+.opencode/**
+.ai/**
+openspec/**
+.skel-out/**
+collections/**
+*.tar.gz
+
+## logs
+logs/
+*.log
+
+## python
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+## development stuff
+_tmp/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# dev files
+.ansible-lint
+.editorconfig
+.flake8
+.git/
+.gitlab-ci.yml
+.gitignore
+AGENTS.md
+TECHSTACK.md
+Dockerfile
+requirements.txt
+scripts/*
+callback_plugins/*
+roles/.skeletons/**
+.markdownlint.json
+.prettierrc
+.yamllint.yml

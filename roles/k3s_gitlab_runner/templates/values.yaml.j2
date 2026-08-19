@@ -1,20 +1,53 @@
 ---
-gitlabUrl: {{ runner_item.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) }}
-runnerToken: {{ runner_item.token | default(k3s_gitlab_runner_token) }}
+gitlabUrl: {{ runner_item.gitlab_url | default(k3s_gitlab_runner_gitlab_external_url) | to_json }}
+runnerToken: {{ k3s_gitlab_runner_resolved_token | to_json }}
+
+replicas: {{ k3s_gitlab_runner_manager_replicas_effective }}
+concurrent: {{ runner_item.concurrent | default(k3s_gitlab_runner_concurrent) }}
+
+metrics:
+  enabled: {{ k3s_gitlab_runner_metrics_enabled | bool | lower }}
+  port: {{ k3s_gitlab_runner_metrics_port }}
+  serviceMonitor:
+    enabled: {{ k3s_gitlab_runner_service_monitor_enabled | bool | lower }}
+service:
+  enabled: {{ k3s_gitlab_runner_service_monitor_enabled | bool | lower }}
+
+{% if k3s_gitlab_runner_manager_pdb_enabled | bool and k3s_gitlab_runner_manager_replicas_effective | int > 1 %}
+podDisruptionBudget:
+  minAvailable: 1
+{% else %}
+podDisruptionBudget: {}
+{% endif %}
+
+{% if k3s_gitlab_runner_manager_replicas_effective | int > 1 %}
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              release: {{ k3s_gitlab_runner_name | to_json }}
+{% else %}
+affinity: {}
+{% endif %}
 
 rbac:
   create: true
 
-concurrent: {{ runner_item.concurrent | default(k3s_gitlab_runner_concurrent) }}
-
 runners:
   config: |
     [[runners]]
-      name = "{{ runner_item.name }}"
+      name = "{{ k3s_gitlab_runner_name }}"
       executor = "kubernetes"
-{% if k3s_gitlab_runner_hooks_enabled | default(true) %}
+{% if k3s_gitlab_runner_hooks_enabled | bool %}
       pre_build_script = "/opt/gitlab-runner/scripts/pre-build.sh"
       post_build_script = "/opt/gitlab-runner/scripts/post-build.sh"
+{% endif %}
+{% if k3s_gitlab_runner_is_tshirt | bool %}
+      limit = {{ k3s_gitlab_runner_limit }}
 {% endif %}
       [runners.kubernetes]
         image = "{{ runner_item.image | default('python:3') }}"
@@ -22,24 +55,35 @@ runners:
         pull_policy = "always"
         allowed_pull_policies = ["always", "if-not-present", "never"]
         privileged = {{ runner_item.privileged | default(false) | lower }}
-{% if k3s_gitlab_runner_hooks_enabled | default(true) %}
+{% if k3s_gitlab_runner_is_tshirt | bool %}
+        cpu_request = "{{ runner_item.value.cpu_request }}"
+        memory_request = "{{ runner_item.value.memory_limit }}"
+        memory_limit = "{{ runner_item.value.memory_limit }}"
+{% if k3s_gitlab_runner_ephemeral_storage_enabled | bool %}
+        ephemeral_storage_limit = "{{ k3s_gitlab_runner_ephemeral_storage_limit }}"
+{% endif %}
+{% if runner_item.key in ['l', 'xl', 'xxl'] %}
+        priority_class_name = "runner-priority-high"
+{% endif %}
+{% endif %}
+{% if k3s_gitlab_runner_hooks_enabled | bool %}
         [[runners.kubernetes.volumes.host_path]]
           name = "runner-scripts"
           mount_path = "/opt/gitlab-runner/scripts"
-          host_path = "/data/{{ app_name}}/scripts"
+          host_path = "{{ app_path }}/scripts"
           mount_propagation = "None"
           read_only = true
 {% endif %}
 {% if runner_item.cache is defined %}
-        [runners.cache]
-          Type = "s3"
-          Shared = true
-          [runners.cache.s3]
-            ServerAddress = "{{ runner_item.cache.server }}"
-            AccessKey = "{{ runner_item.cache.access_key }}"
-            SecretKey = "{{ runner_item.cache.secret_key }}"
-            BucketName = "{{ runner_item.cache.bucket }}"
-            Insecure = {{ runner_item.cache.insecure | default(true) | lower }}
+      [runners.cache]
+        Type = "s3"
+        Shared = true
+        [runners.cache.s3]
+          ServerAddress = "{{ runner_item.cache.server }}"
+          AccessKey = "{{ runner_item.cache.access_key }}"
+          SecretKey = "{{ runner_item.cache.secret_key }}"
+          BucketName = "{{ runner_item.cache.bucket }}"
+          Insecure = {{ runner_item.cache.insecure | default(true) | lower }}
 {% endif %}
 {% if runner_item.extra_config is defined %}
     {{ runner_item.extra_config | indent(4) }}

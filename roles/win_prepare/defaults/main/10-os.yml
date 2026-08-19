@@ -12,6 +12,5 @@ win_package_list:
   - name: notepadplusplus
   - name: firefoxesr
 
-win_pip_list:
-  []
+win_pip_list: []
   # - requests

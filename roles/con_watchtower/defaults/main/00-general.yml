@@ -3,6 +3,7 @@
 ###############################################################################
 ---
 storage_base_path: /data
+storage_base_path_win: C:\\data
 
 http:
   retries: 40

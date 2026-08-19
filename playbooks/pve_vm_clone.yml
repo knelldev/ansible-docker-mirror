@@ -1,0 +1,5 @@
+---
+- name: "Playbook: pve_vm_clone"
+  hosts: "{{ hosts_limit | default('all') }}"
+  roles:
+    - pve_vm_clone

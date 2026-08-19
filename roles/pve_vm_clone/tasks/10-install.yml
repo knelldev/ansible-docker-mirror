@@ -1,16 +1,16 @@
 ---
-- name: "({{ task_filename }}) Block: local connection"
+- name: "Block: local connection"
   connection: local
   delegate_to: localhost
   block:
-    - name: "({{ task_filename }}) Validate Proxmox connection details are provided"
+    - name: Validate Proxmox connection details are provided
       ansible.builtin.fail:
         msg: >
           Proxmox connection details (pve_vm_clone_api_host, pve_vm_clone_api_user, pve_vm_clone_api_password) are required.
           Please set them in your inventory, playbook, or as environment variables."
       when: pve_vm_clone_api_host is not defined or pve_vm_clone_api_user is not defined or pve_vm_clone_api_password is not defined
 
-    - name: "({{ task_filename }}) Ensure Proxmox VM is created"
+    - name: Ensure Proxmox VM is created
       community.general.proxmox_kvm:
         api_host: "{{ pve_vm_clone_api_host }}"
         api_port: "{{ pve_vm_clone_api_port }}"
@@ -28,7 +28,7 @@
         timeout: "{{ pve_vm_clone_timeout }}"
       register: vm_state
 
-    - name: "({{ task_filename }}) Ensure Proxmox VM is configured"
+    - name: Ensure Proxmox VM is configured
       community.general.proxmox_kvm:
         api_host: "{{ pve_vm_clone_api_host }}"
         api_port: "{{ pve_vm_clone_api_port }}"
@@ -51,7 +51,7 @@
         searchdomains: "{{ pve_vm_clone_ci_searchdomain | default(omit) }}"
       register: vm_state
 
-    - name: "({{ task_filename }}) Grow existing disk"
+    - name: Grow existing disk
       community.general.proxmox_disk:
         api_host: "{{ pve_vm_clone_api_host }}"
         api_port: "{{ pve_vm_clone_api_port }}"
@@ -64,7 +64,7 @@
       loop: "{{ pve_vm_clone_resize_disk_list }}"
       when: pve_vm_clone_resize_disk_list is defined
 
-    - name: "({{ task_filename }}) Start VM"
+    - name: Start VM
       community.general.proxmox_kvm:
         api_host: "{{ pve_vm_clone_api_host }}"
         api_port: "{{ pve_vm_clone_api_port }}"
@@ -75,7 +75,7 @@
         name: "{{ pve_vm_clone_vm_name }}"
         state: started
 
-    - name: "({{ task_filename }}) Wait for SSH port to become available"
+    - name: Wait for SSH port to become available
       ansible.builtin.wait_for:
         host: "{{ pve_vm_clone_ci_ipconfig | regex_search('ip=([^/]+)', '\\1') | first }}"
         port: "{{ pve_vm_clone_ssh_port }}"

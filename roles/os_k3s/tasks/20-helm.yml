@@ -1,15 +1,15 @@
 ---
-- name: "Helm install block"
+- name: Helm install block
   when: os_k3s_helm_install
   block:
-    - name: "Download get-helm.sh"
+    - name: Download get-helm.sh
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
         dest: /tmp/get-helm.sh
         mode: "0700"
         force: true
 
-    - name: "execute get-helm.sh"
+    - name: Execute get-helm.sh
       ansible.builtin.shell: "/tmp/get-helm.sh"
       args:
         executable: /bin/bash
@@ -17,7 +17,7 @@
       register: os_k3s_register_helm_output
       changed_when: "'is already latest' not in os_k3s_register_helm_output.stdout"
 
-    - name: "ensure permission of helm binary"
+    - name: Ensure permission of helm binary
       ansible.builtin.file:
         dest: /usr/local/bin/helm
         mode: "0755"
