@@ -1,35 +1,46 @@
 ## Status
 
-- Approval: skeleton approved 2026-10-17; task implementation not approved.
+- Approval: skeleton approved 2026-10-17; IPv6-only scope set 2026-10-17;
+  task implementation not approved.
 - Plan state: skeleton done, implementation blocked.
-- Blocker: E-Q3 (inventory of the current VPS) in the migration repo; target
-  OS; CrowdSec container vs package.
+- Blocker: target OS; CrowdSec container vs package.
 
 ## 1. Skeleton
 
 - [x] 1.1 Generate `roles/os_edge/` from the role skeleton; write the
       variable contract, README, AGENTS and TODO task files.
 - [x] 1.2 Add `playbooks/os_edge.yml`.
+- [x] 1.3 Narrow to an IPv6-only WireGuard endpoint; `legacy` IPv4
+      forwarding documented only.
 
 ## 2. Implementation (after approval)
 
-- [ ] 2.1 Install wireguard-tools and nftables; WireGuard interface.
-- [ ] 2.2 Forwarding (sysctl, routing, nftables) copied from the current VPS.
-- [ ] 2.3 Firewall with SSH allowlist guard and timed rollback.
+- [ ] 2.1 Install wireguard-tools and nftables.
+- [ ] 2.2 Host-generated key, WireGuard interface (no peer Endpoint, MTU
+      1412), print the OPNsense peer data.
+- [ ] 2.3 Firewall: SSH allowlist guard, WireGuard port, ICMPv6, timed
+      rollback.
 - [ ] 2.4 CrowdSec Quadlet registered on the OPNsense LAPI; optional bouncer.
 
 ## 3. Verification
 
 - [x] 3.1 `ansible-lint`, `yamllint`, syntax check for the skeleton.
-- [ ] 3.2 Fresh test VPS: forwarding works and client IPs arrive at OPNsense.
-      Rollback: DNS back to the old VPS.
+- [ ] 3.2 Fresh test VPS: OPNsense dials in, tunnel pings both ways, SSH
+      only from the allowlist. Rollback: destroy the test VPS.
+
+## Follow-ups
+
+- `os_edge_forward_v6`: forward or DNAT public IPv6 traffic into the tunnel
+  (disabled by default).
+- IPv4 reachability for IPv4-only clients.
 
 ## Verification Evidence
 
 - 2026-10-17: skeleton passes `ansible-lint` (production), `yamllint` and the
   syntax check.
+- 2026-10-17: IPv6-only rework passes the same checks and
+  `openspec validate --strict`.
 
 ## Next Action
 
-- Inventory the current VPS (E-Q3, read-only) and decide the forwarding
-  method.
+- Decide target OS and CrowdSec packaging, then approve implementation.

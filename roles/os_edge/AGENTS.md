@@ -2,8 +2,9 @@
 
 ## Purpose
 
-Entry VPS: WireGuard tunnel to OPNsense, forwarding of the whole public IPv4
-into the tunnel without SNAT, nftables firewall, CrowdSec agent.
+Entry VPS, IPv6 only: bare WireGuard server on the public IPv6 that OPNsense
+dials into, nftables firewall, CrowdSec agent. No forwarding of public traffic
+yet; the IPv4-forwarding VPS is `legacy` and documented only.
 
 ## Local Contracts
 

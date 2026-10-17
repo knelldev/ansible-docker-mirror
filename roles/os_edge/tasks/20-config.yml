@@ -1,9 +1,16 @@
 # TODO(add-edge-vps-role):
-# - WireGuard interface from os_edge_wg_* (listen only, Table = off).
-# - sysctl net.ipv4.ip_forward=1; rp_filter loose on the public interface.
-# - nftables: input allows SSH from os_edge_ssh_allow and the WireGuard port;
-#   prerouting DNATs nothing else, but routes all other traffic for
-#   os_edge_public_ipv4 into the tunnel (policy route, no SNAT); replies from
-#   the tunnel leave via the public interface. Apply with a timed rollback
-#   (nft -c check, then a confirm/revert window) to avoid a lockout.
+# - Keys: if /etc/wireguard/<if>.key is missing, generate it on the host
+#   (umask 077, `wg genkey`, guarded by `creates:`); derive <if>.pub with
+#   `wg pubkey`. The private key never goes to the controller or the repo.
+# - <if>.conf from a template: Address, ListenPort, MTU, Table = off,
+#   PostUp `wg set %i private-key /etc/wireguard/<if>.key`; one [Peer] with
+#   PublicKey and AllowedIPs (peer tunnel address + extras), no Endpoint
+#   (OPNsense has a dynamic prefix and sets PersistentKeepalive).
+# - Enable wg-quick@<if>; print the VPS public IPv6, listen port, public key
+#   and tunnel addresses for the OPNsense peer.
+# - nftables: input policy drop; allow established/related, lo, ICMPv6
+#   (neighbour discovery, packet-too-big, echo, router advertisements),
+#   ICMP needed for PMTU, UDP listen port, SSH from os_edge_ssh_allow and
+#   from the tunnel. Forward policy drop. Fail first if os_edge_ssh_allow is
+#   empty; check with `nft -c`, apply with a timed rollback.
 ---

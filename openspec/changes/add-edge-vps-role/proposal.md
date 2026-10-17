@@ -3,28 +3,33 @@
 Public homelab apps enter through a VPS (no static IP at home). The migration
 repo (`lab_01_migrations`, change `edge-vps-geodns`) wants every entry VPS
 rebuildable from code, and more than one of them later (Spain, Germany).
-Today the VPS forwards its whole public IPv4 over WireGuard to OPNsense, which
-keeps client addresses for Caddy, authentik and CrowdSec.
+New VPSes are IPv6 only (no paid IPv4), so the first job of the role is a
+WireGuard endpoint on IPv6 that OPNsense can dial into.
 
 ## What Changes
 
 - Add `roles/os_edge/` and `playbooks/os_edge.yml` for an entry VPS:
-  - WireGuard tunnel to OPNsense (VPS listens, OPNsense dials in).
-  - All traffic for the public IPv4 routed into the tunnel without SNAT,
-    except what the VPS answers itself (SSH, WireGuard).
-  - nftables firewall: SSH only from an allowlist.
+  - Bare WireGuard server on the VPS's public IPv6; OPNsense dials in.
+  - VPS private key generated on the host; the role prints what OPNsense
+    needs (public IPv6, port, public key, tunnel addresses).
+  - nftables firewall: SSH only from an allowlist (and over the tunnel), the
+    WireGuard port, ICMPv6 for neighbour discovery and PMTU.
   - CrowdSec agent in a Podman Quadlet (sshd and linux collections),
     registered as a machine on the OPNsense LAPI over WireGuard; optional
     host nftables bouncer.
-- This first step adds only the skeleton and the variable contract; tasks are
-  TODOs until the blockers below are resolved.
+- Not in this version: forwarding or DNAT of public traffic into the tunnel
+  (follow-up `os_edge_forward_v6`).
+- The current IPv4 VPS (whole public IPv4 routed to the VPS and forwarded
+  into WireGuard) stays as it is: documented as `legacy`, no role path.
+- This step adds only the skeleton and the variable contract; tasks are TODOs
+  until the blockers in `tasks.md` are resolved.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `edge-vps`: entry VPS forwarding its public IPv4 to OPNsense with a minimal
-  firewall and CrowdSec reporting.
+- `edge-vps`: IPv6-only entry VPS with a WireGuard endpoint for OPNsense, a
+  minimal firewall and CrowdSec reporting.
 
 ### Modified Capabilities
 
@@ -33,20 +38,25 @@ keeps client addresses for Caddy, authentik and CrowdSec.
 ## Impact
 
 - New role, playbook, role README/AGENTS, `roles/AGENTS.md` index.
-- External: OPNsense WireGuard peer and CrowdSec LAPI machine registration.
+- External: OPNsense WireGuard peer (client side, PersistentKeepalive) and
+  CrowdSec LAPI machine registration.
 - Separate from `os_vps` and `specify-os-vps-role` (generic VPS tuning).
 
 ## Alternatives And Risks
 
-- DNAT per port on the VPS: simpler rules, but every new port needs a change
-  and scans on other ports stay invisible to OPNsense's CrowdSec.
-- PROXY protocol from a VPS proxy: keeps client IPs only for HTTP/TLS, not for
-  game or other TCP/UDP ports.
+- Rebuild the `legacy` IPv4 forwarding in the role: needs a paid IPv4 per VPS
+  and the exact rules of the current VPS (E-Q3); deferred.
+- Static private key in the vault: simpler rebuilds with the same OPNsense
+  peer, but a secret to manage; a host-generated key means a rebuilt VPS
+  needs its new public key entered on OPNsense.
 - CrowdSec as a host package: fewer moving parts on a tiny VPS, but splits
-  from the repository's container model; decide in E-Q3 follow-up.
-- Risk: firewall or routing mistakes lock out SSH. Mitigation: non-empty
-  allowlist enforced, `nft -c` check, timed rollback.
+  from the repository's container model.
+- Risk: an IPv6-only VPS is unreachable for IPv4-only clients; public entry
+  needs the forwarding follow-up or a dual-stack front.
+- Risk: firewall mistakes lock out SSH. Mitigation: non-empty allowlist
+  enforced, SSH over the tunnel, `nft -c` check, timed rollback.
 
 Approval status: skeleton and plan approved by the user on 2026-10-17
-("start caddy/vps as podman"). Task implementation needs a separate approval
-after the blockers in `tasks.md` are resolved.
+("start caddy/vps as podman"); IPv6-only scope set by the user on
+2026-10-17. Task implementation needs a separate approval after the blockers
+in `tasks.md` are resolved.

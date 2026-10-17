@@ -1,20 +1,43 @@
 ## ADDED Requirements
 
-### Requirement: Client addresses reach OPNsense
+### Requirement: WireGuard endpoint on IPv6
 
-The entry VPS SHALL forward traffic for its public IPv4 through the WireGuard
-tunnel without source NAT, except traffic the VPS answers itself.
+The entry VPS SHALL run a WireGuard server on its public IPv6 with exactly one
+peer (OPNsense) that has no Endpoint, and SHALL NOT forward public traffic
+into the tunnel.
 
-#### Scenario: HTTPS request through the VPS
+#### Scenario: OPNsense dials in
 
-- **WHEN** a client connects to the VPS public IPv4 on port 443
-- **THEN** OPNsense receives the connection with the client's address as
-  source
+- **WHEN** OPNsense connects to the VPS public IPv6 and listen port with the
+  configured keys
+- **THEN** the tunnel comes up and both tunnel addresses answer pings
+
+#### Scenario: Large packets over PPPoE
+
+- **WHEN** a full-size packet crosses the tunnel
+- **THEN** it passes with the tunnel MTU 1412 without fragmentation errors
+
+### Requirement: VPS private key stays on the host
+
+The role SHALL generate the VPS private key on the host when missing, SHALL
+NOT store it in the repository or on the controller, and SHALL print the VPS
+public key.
+
+#### Scenario: First run
+
+- **WHEN** the role runs on a fresh VPS
+- **THEN** a key file with mode 0600 exists on the host and the run output
+  shows the public key, public IPv6, listen port and tunnel addresses
+
+#### Scenario: Rerun
+
+- **WHEN** the role runs again
+- **THEN** the existing key is kept
 
 ### Requirement: SSH only from the allowlist
 
-The VPS SHALL accept SSH only from `os_edge_ssh_allow`, and the role SHALL
-refuse to apply firewall rules when that list is empty.
+The VPS SHALL accept SSH only from `os_edge_ssh_allow` and over the tunnel,
+and the role SHALL refuse to apply firewall rules when that list is empty.
 
 #### Scenario: Empty allowlist
 

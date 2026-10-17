@@ -72,7 +72,7 @@ inventory handling, and Semaphore configuration, see
 
 - `os_prepare.yml`, `os_container.yml`, and `os_k3s.yml` for Linux preparation,
   container runtime setup, and K3s
-- `os_edge.yml` for an entry VPS (draft, tasks not implemented)
+- `os_edge.yml` for an IPv6 entry VPS (draft, tasks not implemented)
 - `con_caddy.yml`, `con_gitlab.yml`, `con_minio.yml`, `con_nginx.yml`, and
   `con_semaphore.yml` for Podman container deployments
 - `k3s_gitlab_runner.yml` for GitLab Runner on K3s

@@ -102,7 +102,7 @@ Individual role [`AGENTS.md`](AGENTS.md) files exist for all roles:
 - **con_watchtower/** - Watchtower auto-update
 - **k3s_gitlab_runner/** - GitLab Runner on K3s
 - **os_container/** - OS container runtime setup
-- **os_edge/** - Entry VPS (draft): WireGuard forward, nftables, CrowdSec
+- **os_edge/** - Entry VPS (draft): IPv6 WireGuard endpoint for OPNsense, nftables, CrowdSec
 - **os_gitlab_runner/** - GitLab Runner installation
 - **os_k3s/** - K3s Kubernetes cluster
 - **os_mount/** - NFS server/client
