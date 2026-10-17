@@ -1,0 +1,53 @@
+---
+- name: Validate site definitions for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.upstream is defined or item.redirect is defined
+      - item.auth | default('') in ['', 'authentik']
+      - item.auth | default('') != 'authentik' or con_caddy_authentik_outpost_url | length > 0
+      - item.upstream_tls | default('') in ['', 'skip_verify']
+    fail_msg: >-
+      Site {{ item.name | default('(no name)') }} needs a name, an upstream or
+      redirect, and con_caddy_authentik_outpost_url when auth is authentik.
+    quiet: true
+  loop: "{{ con_caddy_sites }}"
+  loop_control:
+    label: "{{ item.name | default('(no name)') }}"
+
+- name: Check that site names are unique for {{ app_name }}
+  vars:
+    _names: "{{ con_caddy_sites | map(attribute='name') | list + con_caddy_sites | map(attribute='aliases', default=[]) | flatten }}"
+  ansible.builtin.assert:
+    that: _names | length == _names | unique | length
+    fail_msg: Site names and aliases in con_caddy_sites must be unique.
+    quiet: true
+
+- name: Prepare account and storage for {{ app_name }}
+  become: true
+  block:
+    - name: Create user and group for {{ app_name }}
+      when: app_user_create
+      block:
+        - name: Create group for {{ app_name }}
+          ansible.builtin.group:
+            name: "{{ app_group }}"
+            system: true
+            state: present
+
+        - name: Create user for {{ app_name }}
+          ansible.builtin.user:
+            name: "{{ app_user }}"
+            group: "{{ app_group }}"
+            system: true
+            create_home: false
+            state: present
+
+    - name: Create storage directories for {{ app_name }}
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner | default(app_user if (app_user_create | bool) else 'root') }}"
+        group: "{{ item.group | default(app_group if (app_user_create | bool) else 'root') }}"
+        mode: "{{ item.mode | default('0700') }}"
+      loop: "{{ [{'name': ''}] + (vars[role_name + '_storage_extra_dirs'] | default([])) }}"

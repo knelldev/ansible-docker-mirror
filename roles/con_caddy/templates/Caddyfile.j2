@@ -1,0 +1,91 @@
+# {{ ansible_managed }}
+{
+	email {{ con_caddy_acme_email }}
+	acme_dns cloudflare {env.CF_API_TOKEN}
+{% if con_caddy_cert_wildcards | length > 0 %}
+	tls_automate_names {{ con_caddy_cert_wildcards | join(' ') }}
+{% endif %}
+{% if con_caddy_proxy_protocol_allow | length > 0 %}
+	servers :443 {
+		listener_wrappers {
+			proxy_protocol {
+				allow {{ con_caddy_proxy_protocol_allow | join(' ') }}
+			}
+			tls
+		}
+	}
+{% endif %}
+}
+
+(common) {
+	encode zstd gzip
+	log {
+		output file /var/log/caddy/access.log
+		format json
+	}
+	handle_errors 502 503 504 {
+		root * /srv/errors
+		rewrite * /error.html
+		file_server {
+			status {err.status_code}
+		}
+	}
+}
+{% for site in con_caddy_sites %}
+
+{{ ([site.name] + site.aliases | default([])) | join(', ') }} {
+	import common
+{% for key, value in (site.headers_down | default({})).items() %}
+	header {{ key }} "{{ value }}"
+{% endfor %}
+{% if site.noindex | default(false) %}
+	header X-Robots-Tag "noindex, nofollow"
+	handle /robots.txt {
+		respond "User-agent: *
+Disallow: /
+" 200
+	}
+{% endif %}
+{% if site.block_paths | default([]) | length > 0 %}
+	@blocked path {{ site.block_paths | join(' ') }}
+	handle @blocked {
+		error 404
+	}
+{% endif %}
+{% for response in site.responses | default([]) %}
+	handle {{ response.path }} {
+		header Content-Type "{{ response.content_type | default('text/plain; charset=utf-8') }}"
+		respond `{{ response.body }}` {{ response.status | default(200) }}
+	}
+{% endfor %}
+	handle {
+{% if site.redirect is defined %}
+		redir {{ site.redirect }}
+{% else %}
+		route {
+{% if site.auth | default('') == 'authentik' %}
+			reverse_proxy /outpost.goauthentik.io/* {{ con_caddy_authentik_outpost_url }}
+{% if site.auth_skip_paths | default([]) | length > 0 %}
+			@auth not path {{ site.auth_skip_paths | join(' ') }}
+{% endif %}
+			forward_auth {{ '@auth ' if site.auth_skip_paths | default([]) | length > 0 else '' }}{{ con_caddy_authentik_outpost_url }} {
+				uri /outpost.goauthentik.io/auth/caddy
+				copy_headers {{ con_caddy_authentik_copy_headers | join(' ') }}
+				trusted_proxies private_ranges
+			}
+{% endif %}
+			reverse_proxy {{ [site.upstream] | flatten | join(' ') }} {
+{% if site.lb_policy is defined %}
+				lb_policy {{ site.lb_policy }}
+{% endif %}
+{% if site.upstream_tls | default('') == 'skip_verify' %}
+				transport http {
+					tls_insecure_skip_verify
+				}
+{% endif %}
+			}
+		}
+{% endif %}
+	}
+}
+{% endfor %}

@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Caddy reverse proxy
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=caddy
+Image={{ con_caddy_image }}
+
+EnvironmentFile={{ app_path }}/caddy.env
+# Host network: binds 80/443 directly, keeps client IPs and reaches upstreams
+# on localhost and the LAN.
+Network=host
+
+Volume={{ app_path }}/conf:/etc/caddy:Z,ro
+Volume={{ app_path }}/errors:/srv/errors:Z,ro
+Volume={{ app_path }}/data:/data:Z
+Volume={{ app_path }}/config:/config:Z
+Volume={{ app_path }}/logs:/var/log/caddy:Z
+
+[Service]
+ExecReload=/usr/bin/podman exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

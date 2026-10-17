@@ -93,6 +93,7 @@ Sequential ordering ensures execution order matches numbering. Gap between numbe
 
 Individual role [`AGENTS.md`](AGENTS.md) files exist for all roles:
 
+- **con_caddy/** - Per-host Caddy reverse proxy
 - **con_gitlab/** - GitLab container deployment
 - **con_minio/** - MinIO object storage
 - **con_nginx/** - Nginx reverse proxy

@@ -1,0 +1,61 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Third-party Caddy build with the caddy-dns/cloudflare module (CaddyBuilds).
+# Pinned to a full Caddy version; tls_automate_names needs Caddy >= 2.11.6.
+con_caddy_image: docker.io/caddybuilds/caddy-cloudflare:2.11.7
+
+# started | stopped. "stopped" renders and validates everything without
+# starting the public listener.
+con_caddy_systemd_service_state: started
+
+# ACME account email and Cloudflare API token (Zone:Read + DNS:Edit on the
+# zones below). Supply the token from vault; it is written only to a 0600 env
+# file on the host.
+con_caddy_acme_email: __REQUIRED__
+con_caddy_cloudflare_api_token: __REQUIRED__
+
+# Wildcard names whose certificates Caddy manages via DNS-01 without serving
+# them. Sites below that fall under a wildcard reuse it, so their names never
+# reach the public CT logs. Example: ["*.a.knell.dev", "*.knell.dev"]
+con_caddy_cert_wildcards: []
+
+# CIDRs allowed to send a PROXY protocol header on :443 (OPNsense Layer4 SNI
+# passthrough). Empty disables the listener wrapper. Clients from other
+# sources connect normally.
+con_caddy_proxy_protocol_allow: []
+
+# Base URL of the authentik outpost, used by sites with "auth: authentik".
+# Example: http://10.0.10.7:9000
+con_caddy_authentik_outpost_url: ""
+
+# Response headers copied from authentik to the upstream on forward auth.
+con_caddy_authentik_copy_headers:
+  - X-Authentik-Username
+  - X-Authentik-Groups
+  - X-Authentik-Entitlements
+  - X-Authentik-Email
+  - X-Authentik-Name
+  - X-Authentik-Uid
+  - X-Authentik-Jwt
+  - X-Authentik-Meta-Jwks
+  - X-Authentik-Meta-Outpost
+  - X-Authentik-Meta-Provider
+  - X-Authentik-Meta-App
+  - X-Authentik-Meta-Version
+
+# Sites served by this host. Keys per site (see README for details):
+#   name:             site address (required), e.g. app.a.knell.dev
+#   aliases:          extra names for the same site
+#   upstream:         URL or list of URLs; required unless redirect is set
+#   upstream_tls:     skip_verify to accept a self-signed upstream cert
+#   lb_policy:        Caddy lb_policy when upstream is a list, e.g. ip_hash
+#   noindex:          true serves robots.txt "Disallow: /" and X-Robots-Tag
+#   headers_down:     dict of response headers to set
+#   auth:             authentik to enable forward auth
+#   auth_skip_paths:  Caddy path patterns that bypass forward auth
+#   block_paths:      Caddy path patterns answered with 404
+#   responses:        list of {path, body, content_type, status} static replies
+#   redirect:         target URL; everything not matched above gets a 302
+con_caddy_sites: []
