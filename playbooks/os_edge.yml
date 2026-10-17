@@ -1,0 +1,7 @@
+---
+- name: "Playbook: os_edge"
+  hosts: "{{ hosts_limit | default('all') }}"
+  roles:
+    # - os_prepare
+    # - os_container
+    - os_edge

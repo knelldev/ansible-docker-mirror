@@ -1,0 +1,3 @@
+# TODO(add-edge-vps-role): install wireguard-tools and nftables; Podman comes
+# from os_container. Blocked on E-Q3 (current VPS inventory: OS, rules).
+---

@@ -1,0 +1,29 @@
+---
+- name: Prepare account and storage for {{ app_name }}
+  become: true
+  block:
+    - name: Create user and group for {{ app_name }}
+      when: app_user_create
+      block:
+        - name: Create group for {{ app_name }}
+          ansible.builtin.group:
+            name: "{{ app_group }}"
+            system: true
+            state: present
+
+        - name: Create user for {{ app_name }}
+          ansible.builtin.user:
+            name: "{{ app_user }}"
+            group: "{{ app_group }}"
+            system: true
+            create_home: false
+            state: present
+
+    - name: Create storage directories for {{ app_name }}
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner | default(app_user if (app_user_create | bool) else 'root') }}"
+        group: "{{ item.group | default(app_group if (app_user_create | bool) else 'root') }}"
+        mode: "{{ item.mode | default('0700') }}"
+      loop: "{{ [{'name': ''}] + (vars[role_name + '_storage_extra_dirs'] | default([])) }}"

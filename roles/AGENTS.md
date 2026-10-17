@@ -20,7 +20,8 @@ Implemented roles follow standard Ansible layout with top-level `tasks/`,
 `defaults/main/`, `vars/`, `templates/`, and `meta/` directories. Some roles
 include a `files/` directory when static assets are needed. `os_mount` and
 `os_vps` currently have planning/contract files only and are not implemented
-role skeletons.
+role skeletons. `os_edge` is a generated skeleton with a draft variable
+contract and TODO task files.
 
 ### tasks/main.yml Pattern (Maintenance-Free)
 
@@ -101,6 +102,7 @@ Individual role [`AGENTS.md`](AGENTS.md) files exist for all roles:
 - **con_watchtower/** - Watchtower auto-update
 - **k3s_gitlab_runner/** - GitLab Runner on K3s
 - **os_container/** - OS container runtime setup
+- **os_edge/** - Entry VPS (draft): WireGuard forward, nftables, CrowdSec
 - **os_gitlab_runner/** - GitLab Runner installation
 - **os_k3s/** - K3s Kubernetes cluster
 - **os_mount/** - NFS server/client

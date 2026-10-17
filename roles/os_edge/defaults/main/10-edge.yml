@@ -1,0 +1,43 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+# DRAFT variable contract for the entry VPS (OpenSpec change add-edge-vps-role).
+# Tasks are not implemented yet; names may still change.
+---
+# Public side
+os_edge_public_interface: eth0
+os_edge_public_ipv4: __REQUIRED__
+
+# SSH is the only port the VPS answers itself (besides WireGuard). Must not be
+# empty once the firewall is implemented: an empty list would lock you out.
+os_edge_ssh_port: 22
+os_edge_ssh_allow: []
+
+# WireGuard tunnel to OPNsense. OPNsense has no static IP, so it dials in;
+# the VPS only listens.
+os_edge_wg_interface: wg0
+os_edge_wg_listen_port: 51820
+os_edge_wg_address: __REQUIRED__ # e.g. 10.200.121.2/30
+os_edge_wg_private_key: __REQUIRED__ # vault
+os_edge_wg_peer_public_key: __REQUIRED__
+os_edge_wg_peer_address: __REQUIRED__ # OPNsense tunnel address, e.g. 10.200.121.1
+os_edge_wg_mtu: 1420
+
+# Forward all traffic for the public IPv4 into the tunnel without SNAT, so
+# client addresses reach OPNsense. Ports the VPS answers itself are excluded.
+os_edge_forward_enabled: true
+
+# CrowdSec agent (container) reporting to the OPNsense LAPI over WireGuard.
+os_edge_crowdsec_enabled: true
+os_edge_crowdsec_image: docker.io/crowdsecurity/crowdsec:v1.8.1
+os_edge_crowdsec_lapi_url: __REQUIRED__ # e.g. http://10.200.121.1:8080
+os_edge_crowdsec_machine_id: __REQUIRED__
+os_edge_crowdsec_machine_password: __REQUIRED__ # vault
+os_edge_crowdsec_collections:
+  - crowdsecurity/linux
+  - crowdsecurity/sshd
+
+# Optional nftables bouncer on the VPS (host package), pulling decisions from
+# the same LAPI.
+os_edge_crowdsec_bouncer_enabled: false
+os_edge_crowdsec_bouncer_api_key: "" # vault, when the bouncer is enabled

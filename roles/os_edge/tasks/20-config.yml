@@ -1,0 +1,9 @@
+# TODO(add-edge-vps-role):
+# - WireGuard interface from os_edge_wg_* (listen only, Table = off).
+# - sysctl net.ipv4.ip_forward=1; rp_filter loose on the public interface.
+# - nftables: input allows SSH from os_edge_ssh_allow and the WireGuard port;
+#   prerouting DNATs nothing else, but routes all other traffic for
+#   os_edge_public_ipv4 into the tunnel (policy route, no SNAT); replies from
+#   the tunnel leave via the public interface. Apply with a timed rollback
+#   (nft -c check, then a confirm/revert window) to avoid a lockout.
+---
