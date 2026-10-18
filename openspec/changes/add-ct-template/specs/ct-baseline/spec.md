@@ -35,8 +35,9 @@ Podman auto-update.
 
 ### Requirement: Rootless-ready ID range
 
-The baseline SHALL configure subordinate UID/GID allocation inside the
-container's 65536-ID map and SHALL contain no application user.
+The baseline SHALL configure subordinate UID/GID allocation from 10000 to
+65533, inside the container's 65536-ID map, for one app user per container,
+and SHALL contain no application user.
 
 #### Scenario: App role creates a user
 

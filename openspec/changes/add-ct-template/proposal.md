@@ -23,12 +23,17 @@ current templates and replaces them only after a test clone passes.
   - tests a clone of the new template, then destroys the test clone;
   - on failure deletes the new templates and keeps the old ones; on success
     deletes the previous templates unless a clone task from them is running.
-- Add `roles/lxc_base/` (runs inside the CT over SSH): local admin `localadmin`,
-  sshd hardening, a first-boot unit, node_exporter, the weekly update window,
-  the subordinate ID range, and the reset before templating.
+- Add `roles/os_base/` (any EL host, each part switchable): local admin
+  `localadmin`, sshd hardening, a first-boot identity unit, node_exporter,
+  the weekly update window.
+- Add `roles/os_template_reset/` (any guest before templating, VM template
+  later): the reset before templating.
+- All CT-specific values (sizes, bridges, names, subid range, packages) live
+  in the playbook's variables, not in a CT-only role.
 - Reuse `os_prepare` and `os_container` in the baseline, with two small
-  changes: a variable for the dnf-automatic upgrade type (`os_prepare`) and an
-  SELinux guard on the two `semanage`/`restorecon` tasks (`os_container`).
+  changes: a variable for the dnf-automatic upgrade type (`os_prepare`), an
+  SELinux guard on the two `semanage`/`restorecon` tasks and optional subid
+  range variables (`os_container`).
 - Schedule the playbook in Semaphore every ~3 weeks.
 - Dependency: enable `community.proxmox` in `collections/requirements.yml`
   (today commented out) with a version floor, and record it in `TECHSTACK.md`.
@@ -39,7 +44,7 @@ current templates and replaces them only after a test clone passes.
 
 - `ct-template-build`: scheduled, tested build and replacement of the LXC
   templates.
-- `lxc-base`: baseline and reset of an AlmaLinux 10 LXC guest for templating.
+- `ct-baseline`: baseline and reset of an AlmaLinux 10 guest for templating.
 
 ### Modified Capabilities
 
@@ -50,7 +55,8 @@ current templates and replaces them only after a test clone passes.
 - New roles, playbook, role README/AGENTS, `roles/AGENTS.md` index, root
   README playbook list, `TECHSTACK.md` collection row.
 - `os_prepare`: new variable, default keeps today's behavior.
-- `os_container`: SELinux tasks skip where SELinux is not enabled.
+- `os_container`: SELinux tasks skip where SELinux is not enabled; subid
+  range only when set.
 - External: Proxmox API (token from Semaphore secrets), `download.proxmox.com`
   (fetched by the node), EPEL/Alma mirrors, Semaphore schedule.
 

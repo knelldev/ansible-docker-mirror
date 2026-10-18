@@ -43,16 +43,37 @@ destroys only the VMIDs created in this run.
 Variable, default `pve`, allowed `pve`/`pve2`. The role asserts that `vmbr1`
 exists on the node before creating anything (pve3 has none).
 
+### Role split (user, 2026-10-18: flexible, configured by variables)
+
+Every role works on any EL host; what makes a CT template is the playbook's
+variables, not a CT-only role. No `lxc_base`.
+
+| Role | Runs on | Does | Switches and values |
+|---|---|---|---|
+| `os_base` (new) | any EL host: CT, VM, bare metal | local admin, sshd hardening, first-boot identity unit, node_exporter, weekly full-update window | `os_base_admin_enabled`, `os_base_admin_user` (default `localadmin`), `os_base_admin_pubkeys`; `os_base_sshd_enabled`; `os_base_firstboot_enabled`; `os_base_node_exporter_enabled`, `os_base_node_exporter_collectors`; `os_base_weekly_update_enabled`, `os_base_weekly_update_oncalendar` (default `Thu 04:00`), `os_base_weekly_update_reboot` (default `when-needed`) |
+| `os_prepare` (changed) | as today | packages, dnf-automatic | new `os_prepare_dnf_automatic_upgrade_type` (default `default`); packages list already a variable |
+| `os_container` (changed) | as today | Podman, graphroot, auto-update | new `os_container_subid_min`/`_max` (default unset = OS defaults); SELinux guard |
+| `os_template_reset` (new) | any guest about to become a template (CT now, VM template later) | removes identity, keys, logs, caches | `os_template_reset_remove_paths`, `os_template_reset_remove_root_keys` (list); defaults cover the list below |
+| `pve_ct_template` (new) | localhost, Proxmox API | download, build CT, template, int clone, test, swap | node, bridges, template names, pool, storages, sizes, cores, memory, features: all variables, defaults = the decisions in `lab_01_migrations` |
+
+Defaults are on for each `os_base` part; existing hosts are unaffected
+because no current playbook includes `os_base` or `os_template_reset`.
+A VM later uses the same roles with different values (e.g. keep
+`qemu-guest-agent`, no subid range).
+
 ### Baseline order (inside the build CT, as root with the build key)
 
-1. `lxc_base` pre-tasks: group `data` (needed by `os_prepare`, which sets
-   `/data` to `root:data` but creates no group), `localadmin` user, sshd.
-2. `os_prepare` with `os_prepare_packages` overridden without
-   `qemu-guest-agent`, and `os_prepare_dnf_automatic_upgrade_type: security`.
-3. `os_container` with `os_container_auto_update_schedule` set into the
-   Thursday window. Graphroot `/data/containers/storage` lands on `mp0`.
-4. `lxc_base` rest: node_exporter, weekly updates, first-boot unit, subuid
-   range, then the reset as the last step.
+`playbooks/pve_ct_template.yml` sets the CT values in one vars block:
+
+1. `os_base`: `localadmin`, sshd, first-boot unit, node_exporter, weekly
+   window; also creates group `data` (needed by `os_prepare`, which sets
+   `/data` to `root:data` but creates no group).
+2. `os_prepare` with `os_prepare_packages` without `qemu-guest-agent` and
+   `os_prepare_dnf_automatic_upgrade_type: security`.
+3. `os_container` with `os_container_auto_update_schedule` Thu 04:30 and
+   `os_container_subid_min: 10000`, `_max: 65533`. Graphroot
+   `/data/containers/storage` lands on `mp0`.
+4. `os_template_reset` as the last step.
 
 ### Changes to existing roles
 
@@ -66,19 +87,22 @@ exists on the node before creating anything (pve3 has none).
   ansible_selinux.status | default('disabled') == 'enabled'`. Chosen over
   `ansible_virtualization_type == 'lxc'` because it states the real
   precondition and also covers other hosts without SELinux.
+- `os_container`: subid range writes `SUB_UID_MIN/MAX`, `SUB_GID_MIN/MAX` in
+  `/etc/login.defs` only when the variables are set.
 - `os_prepare` has no SELinux tasks. `30-customize.yml` runs an `echo`; left
   as is.
 
-### `lxc_base` contents
+### `os_base` contents
 
-- `localadmin`: SSH key only, locked password, sudo `NOPASSWD`, used by automation
-  and as fallback when authentik is down.
+- Admin user (`localadmin`): SSH key only, locked password, sudo `NOPASSWD`,
+  used by automation and as fallback when authentik is down.
 - sshd drop-in: `PermitRootLogin no`, `PasswordAuthentication no`.
-- First boot: `ct-firstboot.service`, `Before=sshd.service`, runs once per
-  clone (marker `/var/lib/ct-firstboot.done`): new machine-id, `ssh-keygen
-  -A`. Reason: Proxmox keeps the template's host keys and writes only `\n` to
-  `/etc/machine-id` on clone (user's finding). EL's `sshd-keygen` and systemd
-  first boot overlap partly; the unit makes it explicit.
+- First boot: `firstboot-identity.service`, `Before=sshd.service`, runs once
+  per clone (marker `/var/lib/firstboot-identity.done`): new machine-id,
+  `ssh-keygen -A`. Reason: Proxmox keeps the template's host keys and writes
+  only `\n` to `/etc/machine-id` on clone (user's finding). EL's
+  `sshd-keygen` and systemd first boot overlap partly; the unit makes it
+  explicit.
 - node_exporter with `--collector.systemd`. Source (EPEL package for EL10 or
   pinned upstream binary) is not verified yet; task 1.4 decides.
 - Updates: daily security via `os_prepare`'s dnf-automatic. Weekly full update
@@ -86,24 +110,13 @@ exists on the node before creating anything (pve3 has none).
   default`, `reboot = when-needed`), timer Thu 04:00, after the Thu 02:00 PBS
   backup. Podman auto-update Thu 04:30. Whether `reboot = when-needed` works
   with the dnf version in Alma 10 is to be checked in 1.4.
-- Subordinate IDs: `/etc/login.defs` `SUB_UID_MIN/MAX`, `SUB_GID_MIN/MAX`
-  inside the CT's 65536-ID map (see app users below).
-- Reset, last step: remove build key from root, SSH host keys, firstboot
-  marker; truncate `/etc/machine-id`; remove NetworkManager connection files
-  and `/etc/hostname` (Proxmox rewrites them on start); clear logs and
-  journal, dnf cache, shell histories, `/tmp`, `/var/tmp`.
 
-### Reuse on VMs and other hosts (user, 2026-10-18)
+### `os_template_reset` contents
 
-The baseline must keep working for normal VMs and other machines. So:
-- Changes to `os_prepare` and `os_container` are variables or guards whose
-  defaults keep today's behavior on every existing host.
-- Generic parts move into a host-agnostic role (working name `os_base`):
-  `localadmin` user, sshd hardening, first-boot unit, node_exporter, weekly update
-  window. VMs and the later VM template use it too.
-- `lxc_base` keeps only what is container-specific: subordinate ID range
-  inside the 65536-ID map, dropping `qemu-guest-agent`, the reset before
-  templating.
+Remove build key from root, SSH host keys, first-boot marker; truncate
+`/etc/machine-id`; remove NetworkManager connection files and `/etc/hostname`
+(Proxmox rewrites them on start); clear logs and journal, dnf cache, shell
+histories, `/tmp`, `/var/tmp`.
 
 ### App users and the rootless contract
 
@@ -112,8 +125,8 @@ The template has no app user. `define-rootless-podman-user-contract`
 `con_*` roles run rootful Quadlets and create no user, so nothing conflicts
 yet. The gap: the contract says nothing about subuid/subgid. Default
 `useradd` ranges start at 100000, outside the CT's map, so rootless Podman
-would fail. The template sets the range (proposal: 10000–65533, below
-`nobody` 65534) and a per-user count; the contract should reference it.
+would fail. Decided (user, 2026-10-18): one app user per CT with the full
+range 10000–65533 (below `nobody` 65534); the contract should reference it.
 
 ### Clone test
 
@@ -142,5 +155,3 @@ dmz template is tested; int differs only in the bridge.
   `vmbr1` (DMZ) over SSH, or does the build need a fixed IP or a jump host?
 - CT-Q4 (package diff source): store the previous package list in the template
   notes (size limit) or elsewhere?
-- CT-Q5 (subuid size): per-app count. 10000 IDs allow about five apps per CT
-  but break images that use IDs above 10000 (e.g. `nobody` 65534).
