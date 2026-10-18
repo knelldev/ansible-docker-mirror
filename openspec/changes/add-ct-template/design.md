@@ -93,6 +93,18 @@ exists on the node before creating anything (pve3 has none).
   and `/etc/hostname` (Proxmox rewrites them on start); clear logs and
   journal, dnf cache, shell histories, `/tmp`, `/var/tmp`.
 
+### Reuse on VMs and other hosts (user, 2026-10-18)
+
+The baseline must keep working for normal VMs and other machines. So:
+- Changes to `os_prepare` and `os_container` are variables or guards whose
+  defaults keep today's behavior on every existing host.
+- Generic parts move into a host-agnostic role (working name `os_base`):
+  `ops` user, sshd hardening, first-boot unit, node_exporter, weekly update
+  window. VMs and the later VM template use it too.
+- `lxc_base` keeps only what is container-specific: subordinate ID range
+  inside the 65536-ID map, dropping `qemu-guest-agent`, the reset before
+  templating.
+
 ### App users and the rootless contract
 
 The template has no app user. `define-rootless-podman-user-contract`
