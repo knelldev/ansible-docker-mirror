@@ -1,0 +1,66 @@
+---
+# Phase 4 (test clone, as the admin user): checks from the clone test.
+- name: Read clone identity
+  become: true
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - /etc/machine-id
+    - /etc/ssh/ssh_host_ed25519_key.pub
+  register: pve_ct_template_clone_identity
+
+- name: Check machine-id and host key differ from the build CT
+  vars:
+    _build: "{{ hostvars[pve_ct_template_build_name] }}"
+    _mid: "{{ pve_ct_template_clone_identity.results[0].content | b64decode | trim }}"
+    _key: "{{ (pve_ct_template_clone_identity.results[1].content | b64decode).split()[1] }}"
+  ansible.builtin.assert:
+    that:
+      - _mid is ansible.builtin.match('^[0-9a-f]{32}$')
+      - _mid != _build.pve_ct_template_build_machine_id
+      - _key != _build.pve_ct_template_build_hostkey
+    fail_msg: Clone kept the build CT's machine-id or SSH host key.
+    quiet: true
+
+- name: Check default route
+  ansible.builtin.assert:
+    that: ansible_facts.default_ipv4.gateway is defined
+    fail_msg: No default IPv4 route on the clone.
+    quiet: true
+
+- name: Check DNS lookup
+  ansible.builtin.command:
+    cmd: getent hosts {{ pve_ct_template_test_dns_name }}
+  changed_when: false
+
+- name: Read service states
+  ansible.builtin.service_facts:
+
+- name: Check sshd runs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['sshd.service'].state == 'running'
+    fail_msg: sshd is not running on the clone.
+    quiet: true
+
+- name: Check node_exporter systemd metrics
+  ansible.builtin.uri:
+    url: "{{ pve_ct_template_test_metrics_url }}"
+    return_content: true
+  register: pve_ct_template_metrics
+  failed_when: pve_ct_template_test_metrics_match not in pve_ct_template_metrics.content
+
+- name: Create throwaway user for rootless Podman
+  become: true
+  ansible.builtin.user:
+    name: "{{ pve_ct_template_test_user }}"
+    create_home: true
+    state: present
+
+- name: Run a rootless container as the throwaway user
+  become: true
+  become_user: "{{ pve_ct_template_test_user }}"
+  ansible.builtin.command:
+    cmd: podman run --rm {{ pve_ct_template_test_image }} true
+    chdir: "/home/{{ pve_ct_template_test_user }}"
+  changed_when: false

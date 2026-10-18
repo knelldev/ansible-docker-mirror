@@ -1,0 +1,26 @@
+---
+# Phase 2b (build CT, after the baseline, before the reset): package diff,
+# identity values for the clone test, Alma version for the notes.
+- name: Record final package list
+  ansible.builtin.include_tasks: guest_packages.yml
+
+- name: Show full package list (task log)
+  ansible.builtin.debug:
+    var: pve_ct_template_packages
+
+- name: Read build CT machine-id
+  ansible.builtin.slurp:
+    src: /etc/machine-id
+  register: pve_ct_template_build_machine_id_raw
+
+- name: Read build CT SSH host key
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  register: pve_ct_template_build_hostkey_raw
+
+- name: Store build record
+  ansible.builtin.set_fact:
+    pve_ct_template_pkg_diff: "{{ pve_ct_template_packages | difference(pve_ct_template_stock_packages) | sort }}"
+    pve_ct_template_build_machine_id: "{{ pve_ct_template_build_machine_id_raw.content | b64decode | trim }}"
+    pve_ct_template_build_hostkey: "{{ (pve_ct_template_build_hostkey_raw.content | b64decode).split()[1] }}"
+    pve_ct_template_alma_version: "{{ ansible_facts.distribution_version }}"

@@ -1,0 +1,8 @@
+---
+# vars file for pve_ct_template
+pve_ct_template_api_url: "https://{{ pve_ct_template_api_host }}:{{ pve_ct_template_api_port }}/api2/json"
+pve_ct_template_api_headers:
+  Authorization: >-
+    PVEAPIToken={{ pve_ct_template_api_user }}!{{ pve_ct_template_api_token_id }}={{ pve_ct_template_api_token_secret }}
+pve_ct_template_netif_dmz: "name=eth0,bridge={{ pve_ct_template_dmz_bridge }},{{ pve_ct_template_net_options }}"
+pve_ct_template_netif_int: "name=eth0,bridge={{ pve_ct_template_int_bridge }},{{ pve_ct_template_net_options }}"

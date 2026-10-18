@@ -1,0 +1,53 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+# Defaults are the decisions from lab_01_migrations, change idm.
+###############################################################################
+---
+pve_ct_template_node: pve
+pve_ct_template_allowed_nodes: [pve, pve2]
+
+# Stock image from the Proxmox appliance index, downloaded by the node
+pve_ct_template_image_storage: pve-z2
+pve_ct_template_image_regex: '^almalinux-10-default_.*_amd64\.tar\.xz$'
+
+# Guest names. Every stop/convert/destroy checks the prefix.
+pve_ct_template_name_prefix: ct-
+pve_ct_template_dmz_name: ct-alma-10-dmz
+pve_ct_template_int_name: ct-alma-10-int
+pve_ct_template_build_name: ct-build-alma-10
+pve_ct_template_test_name: ct-test-alma-10
+pve_ct_template_leftover_prefixes: [ct-build-, ct-test-]
+pve_ct_template_pool: Templates
+
+# Bridges: dmz template on dmz bridge, int template on int bridge
+pve_ct_template_dmz_bridge: vmbr1
+pve_ct_template_int_bridge: vmbr0
+pve_ct_template_net_options: firewall=1,ip=dhcp
+
+# Size
+pve_ct_template_cores: 2
+pve_ct_template_memory: 2048
+pve_ct_template_swap: 512
+pve_ct_template_features: [nesting=1]
+pve_ct_template_rootfs_storage: pve-ssd
+pve_ct_template_rootfs_size: 15 # GiB
+pve_ct_template_data_storage: pve-ssd
+pve_ct_template_data_size: 35 # GiB
+pve_ct_template_data_mountpoint: /data
+
+# Timeouts (seconds) and waits
+pve_ct_template_timeout: 900
+pve_ct_template_ip_retries: 30
+pve_ct_template_ip_delay: 10
+pve_ct_template_ssh_timeout: 300
+
+# Notes
+pve_ct_template_notes_max_chars: 6000
+pve_ct_template_git_commit: "{{ lookup('ansible.builtin.pipe', 'git -C ' ~ (playbook_dir | quote) ~ ' rev-parse --short HEAD', errors='ignore') | default('unknown', true) }}"
+
+# Clone test
+pve_ct_template_test_user: cttest
+pve_ct_template_test_image: quay.io/libpod/alpine:latest
+pve_ct_template_test_dns_name: almalinux.org
+pve_ct_template_test_metrics_url: http://127.0.0.1:9100/metrics
+pve_ct_template_test_metrics_match: node_systemd_unit_state

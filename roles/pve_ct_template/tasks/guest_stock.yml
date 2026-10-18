@@ -1,0 +1,8 @@
+---
+# Phase 2a (build CT, before the baseline): record the stock package list.
+- name: Record stock package list
+  ansible.builtin.include_tasks: guest_packages.yml
+
+- name: Keep stock package list
+  ansible.builtin.set_fact:
+    pve_ct_template_stock_packages: "{{ pve_ct_template_packages }}"

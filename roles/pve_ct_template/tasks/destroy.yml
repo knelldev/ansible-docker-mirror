@@ -1,0 +1,40 @@
+---
+# Helper: guarded destroy of one guest (pve_ct_template_destroy_vmid).
+# Only an LXC guest whose name starts with the prefix and whose VMID this run
+# created or recorded at its start.
+- name: Look up guest {{ pve_ct_template_destroy_vmid }}
+  community.proxmox.proxmox_vm_info:
+    vmid: "{{ pve_ct_template_destroy_vmid | int }}"
+  register: pve_ct_template_destroy_info
+
+- name: Guard and destroy guest {{ pve_ct_template_destroy_vmid }}
+  when: pve_ct_template_destroy_info.proxmox_vms | length > 0
+  vars:
+    _vm: "{{ pve_ct_template_destroy_info.proxmox_vms | first }}"
+  block:
+    - name: Check guest guard
+      ansible.builtin.assert:
+        that:
+          - pve_ct_template_destroy_info.proxmox_vms | length == 1
+          - _vm.type == 'lxc'
+          - _vm.name is ansible.builtin.match(pve_ct_template_name_prefix | regex_escape)
+          - (pve_ct_template_destroy_vmid | int) in (pve_ct_template_allowed_vmids | map('int') | list)
+        fail_msg: "Guard refused to destroy VMID {{ pve_ct_template_destroy_vmid }} ({{ _vm.name | default('?') }})."
+        quiet: true
+
+    - name: Stop guest
+      when: _vm.status == 'running'
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_destroy_vmid | int }}"
+        node: "{{ _vm.node }}"
+        state: stopped
+        force: true
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Destroy guest
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_destroy_vmid | int }}"
+        node: "{{ _vm.node }}"
+        state: absent
+        purge: true
+        timeout: "{{ pve_ct_template_timeout }}"
