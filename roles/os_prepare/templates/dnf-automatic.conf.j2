@@ -6,7 +6,7 @@ upgrade_type = {{ dnf_automatic_upgrade_type }}
 
 # Download and apply updates
 download_updates = yes
-apply_updates = yes
+apply_updates = {{ 'yes' if dnf_automatic_apply_updates | bool else 'no' }}
 
 # When to reboot after upgrades: never | when-changed | when-needed
 reboot = {{ dnf_automatic_reboot }}

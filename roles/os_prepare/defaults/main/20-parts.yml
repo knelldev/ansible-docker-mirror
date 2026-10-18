@@ -3,8 +3,10 @@
 # Switchable parts. Defaults keep re-runs on existing hosts unchanged.
 ###############################################################################
 ---
-# dnf-automatic (daily timer from 20-configure.yml)
+# dnf-automatic (daily timer from 20-configure.yml). Default: download only,
+# as existing hosts did before (their old config never applied updates).
 os_prepare_dnf_automatic_upgrade_type: default # default | security | ...
+os_prepare_dnf_automatic_apply_updates: false
 os_prepare_dnf_automatic_reboot: never # never | when-changed | when-needed
 
 # Group that owns storage_base_path
@@ -25,8 +27,10 @@ os_prepare_node_exporter_service: node_exporter
 os_prepare_node_exporter_binary: /usr/bin/node_exporter
 os_prepare_node_exporter_args: --collector.systemd
 
-# Weekly full update as a second dnf-automatic unit
-os_prepare_weekly_update_enabled: false
+# Weekly full update as a second dnf-automatic unit, after the Thu 02:00 PBS
+# backup. Reboot `never` by default, so re-runs on existing hosts cause no
+# surprise reboots; the template playbook sets `when-needed`.
+os_prepare_weekly_update_enabled: true
 os_prepare_weekly_update_oncalendar: Thu *-*-* 04:00:00
 os_prepare_weekly_update_upgrade_type: default
-os_prepare_weekly_update_reboot: when-needed
+os_prepare_weekly_update_reboot: never

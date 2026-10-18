@@ -28,6 +28,7 @@
       - ncdu
       - rpmconf
     os_prepare_dnf_automatic_upgrade_type: security
+    os_prepare_dnf_automatic_apply_updates: true
     os_prepare_admin_enabled: true
     os_prepare_admin_user: "{{ pve_ct_template_admin_user }}"
     os_prepare_admin_pubkeys: "{{ pve_ct_template_admin_pubkeys }}"
