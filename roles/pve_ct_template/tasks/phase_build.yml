@@ -72,6 +72,38 @@
         pve_ct_template_allowed_vmids: >-
           {{ (_old + _leftovers) | map(attribute='vmid') | map('int') | list }}
 
+    # Previous dmz template: its notes may hold its package list (CT-Q5)
+    - name: Pick the previous dmz template
+      vars:
+        _prev: >-
+          {{ pve_ct_template_guests.proxmox_vms | selectattr('name', 'equalto', pve_ct_template_dmz_name)
+             | selectattr('template', 'truthy') | sort(attribute='vmid') | list }}
+      ansible.builtin.set_fact:
+        pve_ct_template_prev_vmid: "{{ (_prev | last | default({}, true)).vmid | default('') }}"
+        pve_ct_template_prev_node: "{{ (_prev | last | default({}, true)).node | default('') }}"
+        pve_ct_template_prev_blob: ""
+
+    - name: Read the previous template's notes
+      when: pve_ct_template_prev_vmid | string | length > 0
+      ansible.builtin.uri:
+        url: "{{ pve_ct_template_api_url }}/nodes/{{ pve_ct_template_prev_node }}/lxc/{{ pve_ct_template_prev_vmid }}/config"
+        headers: "{{ pve_ct_template_api_headers }}"
+        validate_certs: "{{ pve_ct_template_validate_certs }}"
+        method: GET
+      register: pve_ct_template_prev_config
+      failed_when: false
+      no_log: true # request headers carry the token secret
+
+    - name: Keep the previous template's package list
+      when:
+        - pve_ct_template_prev_vmid | string | length > 0
+        - pve_ct_template_prev_config.status | default(0) == 200
+      vars:
+        _descr: "{{ pve_ct_template_prev_config.json.data.description | default('') }}"
+        _regex: "(?m)^{{ pve_ct_template_notes_pkglist_marker | regex_escape }}([A-Za-z0-9+/=]+)\\s*$"
+      ansible.builtin.set_fact:
+        pve_ct_template_prev_blob: "{{ _descr | regex_search(_regex, '\\1') | default([], true) | first | default('') }}"
+
     - name: Remove leftovers from a failed run
       ansible.builtin.include_tasks: destroy.yml
       loop: "{{ pve_ct_template_leftover_vmids }}"

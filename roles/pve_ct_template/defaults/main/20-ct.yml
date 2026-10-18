@@ -41,8 +41,14 @@ pve_ct_template_ip_retries: 30
 pve_ct_template_ip_delay: 10
 pve_ct_template_ssh_timeout: 300
 
-# Notes
-pve_ct_template_notes_max_chars: 6000
+# Notes. Proxmox limits an LXC description to 8192 characters
+# (pve-container src/PVE/LXC/Config.pm, maxLength => 1024 * 8).
+# The template stores its package list (gzip, base64) on the marker line so
+# the next build can diff against it; it is left out when it would leave
+# less than notes_min_text_chars for the text.
+pve_ct_template_notes_max_chars: 8000
+pve_ct_template_notes_min_text_chars: 1500
+pve_ct_template_notes_pkglist_marker: "pkglist.gz.b64: "
 pve_ct_template_git_commit: "{{ lookup('ansible.builtin.pipe', 'git -C ' ~ (playbook_dir | quote) ~ ' rev-parse --short HEAD', errors='ignore') | default('unknown', true) }}"
 
 # Clone test

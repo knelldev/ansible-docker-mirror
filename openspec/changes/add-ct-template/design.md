@@ -62,7 +62,7 @@ task files in `os_prepare`.
 
 | Role | Runs on | Does | Switches and values |
 |---|---|---|---|
-| `os_prepare` (extended) | any EL host | as today, plus admin user, first-boot identity unit, node_exporter, weekly full-update window | `os_prepare_admin_enabled` (default off, so re-running on existing hosts changes nothing), `os_prepare_admin_user` (default `localadmin`), `os_prepare_admin_pubkeys`; `os_prepare_firstboot_enabled`, `os_prepare_node_exporter_enabled`, `os_prepare_weekly_update_enabled` (default off: it adds reboots, so existing hosts keep today's behavior; the template playbook turns it on), `os_prepare_weekly_update_oncalendar` (`Thu 04:00`), `os_prepare_weekly_update_reboot` (`when-needed`); `os_prepare_dnf_automatic_upgrade_type` (default `default`) |
+| `os_prepare` (extended) | any EL host | as today, plus admin user, first-boot identity unit, node_exporter, weekly full-update window | `os_prepare_admin_enabled` (default off, so re-running on existing hosts changes nothing), `os_prepare_admin_user` (default `localadmin`), `os_prepare_admin_pubkeys`; `os_prepare_firstboot_enabled`, `os_prepare_node_exporter_enabled`, `os_prepare_weekly_update_enabled` (default on, CT-Q6), `os_prepare_weekly_update_oncalendar` (`Thu 04:00`), `os_prepare_weekly_update_reboot` (default `never`; template `when-needed`); `os_prepare_dnf_automatic_upgrade_type` (default `default`), `os_prepare_dnf_automatic_apply_updates` (default off: download only; template on) |
 | `os_container` (changed) | hosts that run Podman | as today | new `os_container_subid_min`/`_max` (default unset = OS defaults); `os_container_default_netns` (default unset = Podman's default); `os_container_unprivileged_port_start` (default unset = kernel default 1024); SELinux guard |
 | `os_template_reset` (new) | only a guest about to become a template (CT now, VM template later) | removes identity, keys, logs, caches; own role so it never runs on a live host by accident | `os_template_reset_remove_paths`, `os_template_reset_remove_root_keys` |
 | `pve_ct_template` (new) | localhost, Proxmox API | download, build CT, template, int clone, test, swap | node, bridges, template names, pool, storages, sizes, cores, memory, features: all variables, defaults = the decisions in `lab_01_migrations` |
@@ -130,16 +130,33 @@ and the `localadmin` keys are role variables whose defaults are
 key store); Bitwarden Secrets Manager can feed the same variables later
 without code changes. One Semaphore task builds both templates.
 
-### Package diff in the notes (CT-Q4, user: simplest, 2026-10-18)
+### Package diff in the notes (CT-Q4, CT-Q5, user 2026-10-18)
 
-Only the diff goes into the template notes; the full list goes to the task
-log. Implemented as: package list of the stock image (before the baseline)
-against the list after the baseline (`rpm -qa`, lines new or changed). A diff
-against the previous template would need the previous full list stored
-somewhere readable; the notes are too small (Proxmox limits the description
-to 8 KiB [unverified]) and the old template cannot be read without starting
-a clone. Open for the user: keep the stock diff, or store the full list
-elsewhere (CT-Q5).
+The notes hold two diffs (lines new or changed, `name-version-release`):
+against the stock image (package list before the baseline) and against the
+previous template (CT-Q5: "both"). Full lists go to the task log.
+
+The previous list lives in the previous template's own notes, so no extra
+rights, storage or secrets: each build writes its full package list as the
+last notes line `pkglist.gz.b64: <gzip | base64>` (made and unpacked in the
+build CT with `gzip`/`base64`). The next build reads it from the recorded
+old `ct-alma-10-dmz` VMID (`GET /nodes/{node}/lxc/{vmid}/config`, same
+token).
+
+Size: pve-container limits an LXC description to `maxLength => 1024 * 8`
+(8192) characters
+([src/PVE/LXC/Config.pm](https://git.proxmox.com/?p=pve-container.git;a=blob;f=src/PVE/LXC/Config.pm;hb=7cc33f73778067a4b0deaf4443d8b4b2273afe36),
+checked 2026-10-18). Measured in an AlmaLinux 10 container (aarch64, local
+Docker, systemd/openssh/NetworkManager added, then the baseline packages
+incl. podman and node-exporter): 296 packages, 8191 bytes raw, 3876
+characters gzip+base64 (13.1 per package). Estimate for 450 packages: about
+5900. The role caps the notes at 8000 and keeps at least 1500 for the text:
+the list is stored while it is at most about 6500 characters (about 490
+packages at the measured rate). The text is cut to the rest. Fallback: if
+the list does not fit or cannot be made, the notes say so and the next build
+shows only the stock diff; a build without a stored previous list writes
+"no stored package list" instead of that diff. The first build after this
+change has no previous list.
 
 ### Changes to existing roles
 
@@ -169,7 +186,17 @@ elsewhere (CT-Q5).
   `dnf-automatic.timer` start applying updates as the file always intended
   (before, dnf 4 used its documented default `apply_updates = False`,
   [dnf automatic docs](https://dnf.readthedocs.io/en/latest/automatic.html);
-  not checked on a host). User decision: keep this fix (CT-Q6).
+  not checked on a host). `apply_updates` is now a variable
+  (`os_prepare_dnf_automatic_apply_updates`, default `no`), so the daily run
+  on existing hosts keeps downloading only.
+- `os_prepare` defaults for existing hosts (CT-Q6, user 2026-10-18: "weekly
+  after backup just to be sure"): daily download only; weekly full update on
+  (`os_prepare_weekly_update_enabled: true`, Thu 04:00, after the Thu 02:00
+  PBS backup) with `os_prepare_weekly_update_reboot: never`, so a re-run
+  causes no surprise reboots. The template playbook keeps its own values
+  (daily security applied, weekly `when-needed`). Hosts outside the
+  backed-up PBS pools (DMZ, CORE, INT) get the weekly update without a
+  fresh backup.
 - `os_prepare` has no SELinux or firewall tasks. `30-customize.yml` runs an
   `echo`; left as is. New parts go in their own numbered task files, each
   behind its switch.
@@ -268,9 +295,9 @@ after its own test passes, every older `ct-alma-10-*` template it recorded.
   from the Proxmox API; int→DMZ is allowed.
 - CT-Q4 (package diff source): resolved (user: simplest, 2026-10-18): only
   the diff in the notes, full list in the task log.
-- CT-Q5 (diff baseline): the implementation diffs against the stock image,
-  not the previous template (see Package diff). Keep, or store the full list
-  somewhere readable to diff against the previous template?
-- CT-Q6 (dnf-automatic fix on existing hosts): the corrected template makes
-  existing `os_prepare` hosts apply daily updates (all types) on their next
-  run. Keep, or default `apply_updates` to the old effective `no`?
+- CT-Q5 (diff baseline): resolved (user, 2026-10-18: "both"): diff against
+  the stock image and against the previous template, whose list is stored
+  compressed in its own notes; see Package diff.
+- CT-Q6 (dnf-automatic fix on existing hosts): resolved (user, 2026-10-18):
+  daily download only, weekly full update after the backup without reboot;
+  see Changes to existing roles.

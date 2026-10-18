@@ -4,8 +4,10 @@
   with the decisions folded into `design.md`).
 - Repository tasks 1.1 to 1.6 done; live tasks 2.2 to 2.4 need approval per
   step.
-- Open: CT-Q5 (diff baseline), CT-Q6 (dnf-automatic fix on existing hosts)
-  in `design.md`.
+- CT-Q5 (diff baseline) and CT-Q6 (dnf-automatic on existing hosts)
+  resolved (user, 2026-10-18), implemented in `pve_ct_template` and
+  `os_prepare`.
+- Live build (2.2) scheduled by the user for Monday 2026-10-20 afternoon.
 
 ## 1. Repository
 
@@ -31,9 +33,12 @@
 ## 2. Verification
 
 - [x] 2.1 `ansible-lint` (production), `yamllint`, syntax check.
-- [ ] 2.2 Live build on `pve` (needs approval): templates, notes, clone test;
+- [ ] 2.2 Live build on `pve` (needs approval; scheduled by the user for
+      Monday 2026-10-20 afternoon): templates, notes, clone test;
       also verifies the [unverified] items in `design.md` (unprivileged port
       sysctl in an unprivileged CT, node_exporter unit, `vzclone` task id).
+      The first build has no previous package list; the diff against the
+      previous template shows from the second build on.
 - [ ] 2.3 Forced failure (needs approval): old templates stay, new ones gone.
 - [ ] 2.4 Semaphore schedule every ~3 weeks, environment variables from
       `roles/pve_ct_template/README.md`.
@@ -61,7 +66,17 @@
     playbook.
   - `openspec validate add-ct-template --strict`: passes.
 
+- 2026-10-18 (CT-Q5/CT-Q6 follow-up, local only): same `ansible-lint`
+  run: the same 8 pre-existing findings, none in changed lines; `yamllint`:
+  the same 2 meta warnings; syntax check passes; no-secrets failure path
+  as before; notes composition checked in a scratch playbook with a real
+  AlmaLinux 10 package list (296 packages: notes 4746 characters with list;
+  300-line stock diff cut to exactly 8000; list left out when the minimum
+  text does not fit); `pkglist.gz.b64` line read back with the role's
+  regex and unpacked with `base64 -d | gzip -dc` to the same 296 lines;
+  `openspec validate add-ct-template --strict` passes.
+
 ## Next Action
 
-- User: answer CT-Q5 and CT-Q6, set the Semaphore environment, then approve
-  task 2.2 (live build on `pve`).
+- User, Monday 2026-10-20 afternoon: set the Semaphore environment, then
+  run task 2.2 (live build on `pve`).

@@ -1,12 +1,50 @@
 ---
-# Phase 2b (build CT, after the baseline, before the reset): package diff,
-# identity values for the clone test, Alma version for the notes.
+# Phase 2b (build CT, after the baseline, before the reset): package diffs
+# against the stock image and the previous template, compressed package
+# list, identity values for the clone test, Alma version for the notes.
 - name: Record final package list
   ansible.builtin.include_tasks: guest_packages.yml
 
 - name: Show full package list (task log)
   ansible.builtin.debug:
     var: pve_ct_template_packages
+
+# Stored in the template notes for the next build's diff (CT-Q5)
+- name: Compress the package list for the notes
+  ansible.builtin.shell:
+    cmd: set -o pipefail && gzip -9n | base64 -w0
+    executable: /bin/bash
+    stdin: "{{ pve_ct_template_packages | join('\n') }}"
+  register: pve_ct_template_pkg_blob
+  changed_when: false
+  failed_when: false # no list in the notes then; the stock diff stays
+
+- name: Unpack the previous template's package list
+  when: _prev_blob | length > 0
+  vars:
+    _prev_blob: "{{ hostvars['localhost'].pve_ct_template_prev_blob | default('') }}"
+  ansible.builtin.shell:
+    cmd: set -o pipefail && base64 -d | gzip -dc
+    executable: /bin/bash
+    stdin: "{{ _prev_blob }}"
+  register: pve_ct_template_prev_unpacked
+  changed_when: false
+  failed_when: false
+
+- name: Diff against the previous template
+  vars:
+    _prev: >-
+      {{ pve_ct_template_prev_unpacked.stdout_lines | default([])
+         if (pve_ct_template_prev_unpacked.rc | default(1)) == 0 else [] }}
+  ansible.builtin.set_fact:
+    pve_ct_template_prev_found: "{{ _prev | length > 0 }}"
+    pve_ct_template_prev_diff: "{{ pve_ct_template_packages | difference(_prev) | sort }}"
+
+- name: Show the diff against the previous template (task log)
+  ansible.builtin.debug:
+    msg: >-
+      {{ pve_ct_template_prev_diff if pve_ct_template_prev_found
+         else 'No package list stored in the previous template.' }}
 
 - name: Read build CT machine-id
   ansible.builtin.slurp:
@@ -24,3 +62,4 @@
     pve_ct_template_build_machine_id: "{{ pve_ct_template_build_machine_id_raw.content | b64decode | trim }}"
     pve_ct_template_build_hostkey: "{{ (pve_ct_template_build_hostkey_raw.content | b64decode).split()[1] }}"
     pve_ct_template_alma_version: "{{ ansible_facts.distribution_version }}"
+    pve_ct_template_pkg_blob_b64: "{{ pve_ct_template_pkg_blob.stdout | trim if pve_ct_template_pkg_blob.rc == 0 else '' }}"

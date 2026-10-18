@@ -19,17 +19,41 @@
         fail_msg: "Baseline failed: {{ _build.pve_ct_template_baseline_msg | default('build CT not reached') }}"
         quiet: true
 
+    # Text first (diff against the previous template, then the stock diff),
+    # truncated to what is left after the package list line; the list is
+    # left out when it would leave less than notes_min_text_chars (CT-Q5).
     - name: Compose template notes
       vars:
         _diff: "{{ _build.pve_ct_template_pkg_diff | default([]) }}"
+        _prev_diff: "{{ _build.pve_ct_template_prev_diff | default([]) }}"
+        _prev_found: "{{ _build.pve_ct_template_prev_found | default(false) | bool }}"
+        # Joined in double-quoted YAML: a '\n' inside a block scalar stays literal
+        _diff_lines: "{{ _diff | join('\n') }}"
+        _prev_lines: "{{ _prev_diff | join('\n') }}"
+        _blob_line: "{{ pve_ct_template_notes_pkglist_marker }}{{ _build.pve_ct_template_pkg_blob_b64 | default('') }}"
+        _store: >-
+          {{ (_build.pve_ct_template_pkg_blob_b64 | default('') | length > 0)
+             and (_blob_line | length + 1 + pve_ct_template_notes_min_text_chars | int
+                  <= pve_ct_template_notes_max_chars | int) }}
+        _budget: "{{ pve_ct_template_notes_max_chars | int - ((_blob_line | length + 1) if _store | bool else 0) }}"
         _text: |
           AlmaLinux {{ _build.pve_ct_template_alma_version | default('?') }}
           Built {{ now(utc=true).strftime('%Y-%m-%d %H:%M') }} UTC from {{ pve_ct_template_image }}
           ansible-docker commit {{ pve_ct_template_git_commit }}
+          {% if not _store | bool %}
+          Package list not stored: the next build diffs only against the stock image.
+          {% endif %}
+          {% if _prev_found | bool %}
+          Packages new or changed against the previous template {{ pve_ct_template_prev_vmid }} ({{ _prev_diff | length }}):
+          {{ _prev_lines }}
+          {% else %}
+          Previous template: no stored package list, no diff.
+          {% endif %}
           Packages new or changed against the stock image ({{ _diff | length }}):
-          {{ _diff | join('\n') }}
+          {{ _diff_lines }}
+        _short: "{{ _text | trim | truncate(_budget | int, true, '\n[truncated; full lists in the task log]', 0) }}"
       ansible.builtin.set_fact:
-        pve_ct_template_notes: "{{ _text | truncate(pve_ct_template_notes_max_chars | int, true, '\n[truncated; full list in the task log]') }}"
+        pve_ct_template_notes: "{{ _short ~ ('\n' ~ _blob_line if _store | bool else '') }}"
 
     - name: Stop the build CT
       community.proxmox.proxmox:

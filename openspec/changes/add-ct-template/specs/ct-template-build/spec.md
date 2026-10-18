@@ -12,8 +12,16 @@ storage `pve-z2`.
 - **WHEN** the scheduled build runs and every step passes
 - **THEN** both templates exist, are unprivileged, have only `nesting=1`,
   rootfs 15G and `mp0` 35G at `/data` on `pve-ssd`
-- **AND** their notes state the Alma minor version, the git commit and the
-  package diff against the stock image
+- **AND** their notes state the Alma minor version, the git commit, the
+  package diff against the stock image and their package list for the next
+  build
+- **AND** the notes state the package diff against the previous template
+  when the previous template stored its package list
+
+#### Scenario: Package list too large for the notes
+
+- **WHEN** the package list does not fit the notes limit
+- **THEN** the notes say it is not stored and keep the stock diff
 
 #### Scenario: Node without vmbr1
 

@@ -17,8 +17,9 @@ current templates and replaces them only after a test clone passes.
     `firewall=1,ip=dhcp`, root key = build key) on node `pve` or `pve2`;
   - starts it, waits for SSH, runs the baseline, resets it, stops it;
   - converts it to template `ct-alma-10-dmz` in pool `Templates` with notes
-    (Alma minor version, git commit, package diff against the
-    stock image; CT-Q5 in `design.md`);
+    (Alma minor version, git commit, package diffs against the stock
+    image and the previous template, compressed package list; CT-Q5 in
+    `design.md`);
   - full-clones it to `ct-alma-10-int` on `vmbr0` and converts that too;
   - tests a clone of the new template, then destroys the test clone;
   - on failure deletes the new templates and keeps the old ones; on success

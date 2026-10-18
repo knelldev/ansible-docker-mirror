@@ -1,5 +1,5 @@
 ---
-# Helper (guest): installed packages as "name version release arch" lines
+# Helper (guest): installed packages as name-version-release lines
 # -> pve_ct_template_packages
 - name: Read installed packages
   ansible.builtin.package_facts:
@@ -11,5 +11,5 @@
   ansible.builtin.set_fact:
     pve_ct_template_packages: >-
       {{ _p | map(attribute='name')
-         | zip(_p | map(attribute='version'), _p | map(attribute='release'), _p | map(attribute='arch'))
-         | map('join', ' ') | sort }}
+         | zip(_p | map(attribute='version'), _p | map(attribute='release'))
+         | map('join', '-') | unique | sort }}

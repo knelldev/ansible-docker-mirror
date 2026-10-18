@@ -37,6 +37,23 @@ prefix, pool (`Templates`), bridges, CPU, memory, swap, features
 (`nesting=1`), rootfs 15 GiB and `mp0` 35 GiB at `/data` on `pve-ssd`,
 timeouts, notes length, and the clone-test image, DNS name and metrics URL.
 
+## Template notes
+
+Both templates get the same notes, at most `pve_ct_template_notes_max_chars`
+(8000; Proxmox allows 8192 for an LXC description, `maxLength => 1024 * 8` in
+pve-container `src/PVE/LXC/Config.pm`):
+
+1. Alma version, build time and stock image, git commit.
+2. Packages new or changed against the previous `ct-alma-10-dmz` template,
+   if that template stored its package list; else a line saying so.
+3. Packages new or changed against the stock image.
+4. Last line `pkglist.gz.b64: ...`: this build's full package list
+   (`name-version-release`, gzip, base64), read by the next build for item 2.
+   Left out, with a line saying so, when it would leave less than
+   `pve_ct_template_notes_min_text_chars` (1500) for the text.
+
+Items 2 and 3 are cut to fit; the full lists are in the task log.
+
 ## Phases
 
 The role has no numbered task files; the playbook calls one phase file per
@@ -44,8 +61,8 @@ play with `tasks_from`:
 
 | File                                  | Runs on    | Does                                                                                                                          |
 | ------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `phase_build.yml`                     | localhost  | checks, records old templates, removes leftovers, downloads the image (node-side), creates and starts the build CT            |
-| `guest_stock.yml`, `guest_record.yml` | build CT   | package lists, build identity, Alma version                                                                                   |
+| `phase_build.yml`                     | localhost  | checks, records old templates and the previous package list, removes leftovers, downloads the image, starts the build CT      |
+| `guest_stock.yml`, `guest_record.yml` | build CT   | package lists and diffs, compressed list for the notes, build identity, Alma version                                          |
 | `phase_template.yml`                  | localhost  | notes, dmz template, int full clone and template, test clone                                                                  |
 | `guest_test.yml`                      | test clone | identity differs, route, DNS, sshd, node_exporter metrics, rootless `podman run`                                              |
 | `phase_finish.yml`                    | localhost  | success: remove test clone and old templates not being cloned; failure: remove all guests this run created; then fail the run |
