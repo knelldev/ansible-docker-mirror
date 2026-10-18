@@ -45,6 +45,17 @@ and SHALL contain no application user.
 - **THEN** the user gets a subuid/subgid range inside the map and rootless
   Podman runs
 
+### Requirement: Rootless Podman network
+
+The baseline SHALL make the host network the default Podman network for all
+users, and SHALL let unprivileged processes bind ports from 80 upwards.
+
+#### Scenario: Rootless container without a tun device
+
+- **WHEN** an unprivileged user runs `podman run` on a clone without
+  `/dev/net/tun`
+- **THEN** the container starts and uses the clone's network
+
 ### Requirement: Reset before templating
 
 The baseline SHALL remove the build key, SSH host keys, machine-id content,

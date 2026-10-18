@@ -17,8 +17,8 @@ current templates and replaces them only after a test clone passes.
     `firewall=1,ip=dhcp`, root key = build key) on node `pve` or `pve2`;
   - starts it, waits for SSH, runs the baseline, resets it, stops it;
   - converts it to template `ct-alma-10-dmz` in pool `Templates` with notes
-    (Alma minor version, git commit, package diff against the previous
-    template);
+    (Alma minor version, git commit, package diff against the
+    stock image; CT-Q5 in `design.md`);
   - full-clones it to `ct-alma-10-int` on `vmbr0` and converts that too;
   - tests a clone of the new template, then destroys the test clone;
   - on failure deletes the new templates and keeps the old ones; on success
@@ -32,8 +32,12 @@ current templates and replaces them only after a test clone passes.
   in the playbook's variables, not in a CT-only role.
 - Reuse `os_prepare` and `os_container` in the baseline, with two small
   changes: a variable for the dnf-automatic upgrade type (`os_prepare`), an
-  SELinux guard on the two `semanage`/`restorecon` tasks and optional subid
-  range variables (`os_container`).
+  SELinux guard on the two `semanage`/`restorecon` tasks, optional subid
+  range variables, an optional default network namespace for all Podman
+  users and an optional `net.ipv4.ip_unprivileged_port_start` (`os_container`).
+  The template sets rootless Podman to the host network: an unprivileged CT
+  has no `/dev/net/tun`, which pasta and slirp4netns need, and only `root@pam`
+  could add it.
 - Schedule the playbook in Semaphore every ~3 weeks.
 - Dependency: enable `community.proxmox` in `collections/requirements.yml`
   (today commented out) with a version floor, and record it in `TECHSTACK.md`.
@@ -58,7 +62,8 @@ current templates and replaces them only after a test clone passes.
   existing hosts safe (admin user off).
 - `os_container`: SELinux tasks skip where SELinux is not enabled; subid
   range only when set.
-- External: Proxmox API (token from Semaphore secrets), `download.proxmox.com`
+- External: Proxmox API (token and key paths read from environment
+  variables, set by Semaphore now, swappable for Bitwarden Secrets Manager), `download.proxmox.com`
   (fetched by the node), EPEL/Alma mirrors, Semaphore schedule.
 
 ## Scope Boundary And Exclusions
@@ -82,9 +87,11 @@ current templates and replaces them only after a test clone passes.
   template staying, which blocks replacing it. Rejected.
 - Risk: a bug in the cleanup deletes the wrong guest. Mitigation: name prefix
   `ct-`, type `lxc` and recorded VMID checks before every destroy.
-- Risk: rootful Podman overlay storage inside an unprivileged CT; covered by
-  the clone test.
+- Risk: rootless Podman on the host network has no network isolation
+  between containers of one CT; acceptable with one app per CT. Rootful
+  Podman is the last-resort fallback only (`design.md`, Risks).
 - Risk: the token secret and the build/localadmin private keys live in Semaphore.
 
 Approval status: scope decided with the user on 2026-10-18 (session in
-`lab_01_migrations`); plan created only, not approved for implementation.
+`lab_01_migrations`); approved for implementation on 2026-10-18 (user,
+herdr-inbox Q3). Live runs still need approval per step.

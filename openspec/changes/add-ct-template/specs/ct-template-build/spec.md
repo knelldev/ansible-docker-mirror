@@ -13,7 +13,7 @@ storage `pve-z2`.
 - **THEN** both templates exist, are unprivileged, have only `nesting=1`,
   rootfs 15G and `mp0` 35G at `/data` on `pve-ssd`
 - **AND** their notes state the Alma minor version, the git commit and the
-  package diff against the previous template
+  package diff against the stock image
 
 #### Scenario: Node without vmbr1
 
