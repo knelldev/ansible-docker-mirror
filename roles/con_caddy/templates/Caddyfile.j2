@@ -1,7 +1,16 @@
 # {{ ansible_managed }}
 {
 	email {{ con_caddy_acme_email }}
-	acme_dns cloudflare {env.CF_API_TOKEN}
+{% if con_caddy_acme_challenge == 'dns' %}
+	# Default issuers (Let's Encrypt, then ZeroSSL) with DNS-01. cert_issuer
+	# instead of acme_dns, so sites with acme_challenge http keep HTTP-01.
+	cert_issuer acme {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	cert_issuer acme https://acme.zerossl.com/v2/DV90 {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+{% endif %}
 {% if con_caddy_cert_wildcards | length > 0 %}
 	tls_automate_names {{ con_caddy_cert_wildcards | join(' ') }}
 {% endif %}
@@ -14,6 +23,9 @@
 			tls
 		}
 	}
+{% endif %}
+{% if con_caddy_global_options_extra | trim | length > 0 %}
+{{ con_caddy_global_options_extra | trim | regex_replace('(?m)^(?=.)', '\t') }}
 {% endif %}
 }
 
@@ -31,10 +43,25 @@
 		}
 	}
 }
+{% if con_caddy_extra_config | trim | length > 0 %}
+
+{{ con_caddy_extra_config | trim }}
+{% endif %}
 {% for site in con_caddy_sites %}
+{% set challenge = site.acme_challenge | default(con_caddy_acme_challenge) %}
 
 {{ ([site.name] + site.aliases | default([])) | join(', ') }} {
 	import common
+{% if challenge != con_caddy_acme_challenge %}
+	tls {
+{% if challenge == 'dns' %}
+		dns cloudflare {env.CF_API_TOKEN}
+{% else %}
+		issuer acme
+		issuer acme https://acme.zerossl.com/v2/DV90
+{% endif %}
+	}
+{% endif %}
 {% for key, value in (site.headers_down | default({})).items() %}
 	header {{ key }} "{{ value }}"
 {% endfor %}
@@ -52,6 +79,9 @@ Disallow: /
 		error 404
 	}
 {% endif %}
+{% if site.extra_config | default('') | trim | length > 0 %}
+{{ site.extra_config | trim | regex_replace('(?m)^(?=.)', '\t') }}
+{% endif %}
 {% for response in site.responses | default([]) %}
 	handle {{ response.path }} {
 		header Content-Type "{{ response.content_type | default('text/plain; charset=utf-8') }}"
@@ -63,15 +93,24 @@ Disallow: /
 		redir {{ site.redirect }}
 {% else %}
 		route {
-{% if site.auth | default('') == 'authentik' %}
-			reverse_proxy /outpost.goauthentik.io/* {{ con_caddy_authentik_outpost_url }}
+{% if site.auth | default('') | length > 0 %}
+{% set provider = con_caddy_forward_auth_all[site.auth] %}
+{% if provider.proxy_paths | default([]) | length > 0 %}
+			@auth_provider path {{ provider.proxy_paths | join(' ') }}
+			reverse_proxy @auth_provider {{ provider.url }}
+{% endif %}
 {% if site.auth_skip_paths | default([]) | length > 0 %}
 			@auth not path {{ site.auth_skip_paths | join(' ') }}
 {% endif %}
-			forward_auth {{ '@auth ' if site.auth_skip_paths | default([]) | length > 0 else '' }}{{ con_caddy_authentik_outpost_url }} {
-				uri /outpost.goauthentik.io/auth/caddy
-				copy_headers {{ con_caddy_authentik_copy_headers | join(' ') }}
+			forward_auth {{ '@auth ' if site.auth_skip_paths | default([]) | length > 0 else '' }}{{ provider.url }} {
+				uri {{ provider.uri }}
+{% if provider.copy_headers | default([]) | length > 0 %}
+				copy_headers {{ provider.copy_headers | join(' ') }}
+{% endif %}
 				trusted_proxies private_ranges
+{% if provider.extra_config | default('') | trim | length > 0 %}
+{{ provider.extra_config | trim | regex_replace('(?m)^(?=.)', '\t\t\t\t') }}
+{% endif %}
 			}
 {% endif %}
 			reverse_proxy {{ [site.upstream] | flatten | join(' ') }} {
@@ -82,6 +121,9 @@ Disallow: /
 				transport http {
 					tls_insecure_skip_verify
 				}
+{% endif %}
+{% if site.proxy_extra_config | default('') | trim | length > 0 %}
+{{ site.proxy_extra_config | trim | regex_replace('(?m)^(?=.)', '\t\t\t\t') }}
 {% endif %}
 			}
 		}

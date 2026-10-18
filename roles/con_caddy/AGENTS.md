@@ -2,15 +2,22 @@
 
 ## Purpose
 
-Deploy a per-host Caddy reverse proxy with Cloudflare DNS-01 certificates via
-Podman Quadlet.
+Deploy a per-host Caddy reverse proxy with Cloudflare DNS-01 or HTTP-01
+certificates via Podman Quadlet. Replaces the deprecated `con_nginx`.
 
 ## Local Contracts
 
 - Follows the `con_*` layout in [`roles/AGENTS.md`](../AGENTS.md); variables
   prefixed `con_caddy_*`.
-- Required before deploy: `con_caddy_acme_email` and
-  `con_caddy_cloudflare_api_token` (vault).
+- Required before deploy: `con_caddy_acme_email`, and
+  `con_caddy_cloudflare_api_token` (vault) when any site uses DNS-01; an
+  assert in `00-prepare.yml` enforces the token, not the sentinel.
+- Defaults stay generic (`example.com`); every extra is off by default.
+- Host networking is the default; `con_caddy_networks` replaces it, because
+  Podman cannot combine host networking with other networks.
+- Global DNS-01 uses `cert_issuer`, not `acme_dns`: `acme_dns` would also
+  force DNS-01 on per-site `http` issuers.
+- Existing site and authentik variables stay backward compatible.
 - The image stays pinned to a full version with the Cloudflare DNS module; no
   repository-owned Caddy build.
 - The Caddyfile is validated with the pinned image before it replaces the

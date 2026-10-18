@@ -14,3 +14,19 @@ con_caddy_storage_extra_dirs:
   - name: config
   - name: logs
     mode: "0750"
+
+# Forward auth providers by name: the built-in authentik preset, overridable
+# and extendable through con_caddy_forward_auth.
+con_caddy_forward_auth_all: >-
+  {{ {'authentik': {
+        'url': con_caddy_authentik_outpost_url,
+        'uri': '/outpost.goauthentik.io/auth/caddy',
+        'copy_headers': con_caddy_authentik_copy_headers,
+        'proxy_paths': ['/outpost.goauthentik.io/*']}}
+     | combine(con_caddy_forward_auth) }}
+
+# True when any site, or the default, uses the Cloudflare DNS-01 challenge.
+con_caddy_dns_used: >-
+  {{ con_caddy_acme_challenge == 'dns'
+     or con_caddy_sites | selectattr('acme_challenge', 'defined')
+        | selectattr('acme_challenge', 'equalto', 'dns') | list | length > 0 }}

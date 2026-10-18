@@ -10,15 +10,23 @@ con_caddy_image: docker.io/caddybuilds/caddy-cloudflare:2.11.7
 # starting the public listener.
 con_caddy_systemd_service_state: started
 
-# ACME account email and Cloudflare API token (Zone:Read + DNS:Edit on the
-# zones below). Supply the token from vault; it is written only to a 0600 env
-# file on the host.
+# ACME account email.
 con_caddy_acme_email: __REQUIRED__
-con_caddy_cloudflare_api_token: __REQUIRED__
+
+# Default ACME challenge for all sites: dns (DNS-01 through Cloudflare) or
+# http (HTTP-01/TLS-ALPN-01, needs ports 80/443 reachable from the internet).
+# A site can override it with its own acme_challenge key.
+con_caddy_acme_challenge: dns
+
+# Cloudflare API token (Zone:Read + DNS:Edit on the zones of the DNS-01
+# names). Required as soon as any site uses dns. Supply it from vault; it is
+# written only to a 0600 env file on the host.
+con_caddy_cloudflare_api_token: ""
 
 # Wildcard names whose certificates Caddy manages via DNS-01 without serving
 # them. Sites below that fall under a wildcard reuse it, so their names never
-# reach the public CT logs. Example: ["*.a.knell.dev", "*.knell.dev"]
+# reach the public CT logs. Needs con_caddy_acme_challenge dns.
+# Example: ["*.example.com", "*.lab.example.com"]
 con_caddy_cert_wildcards: []
 
 # CIDRs allowed to send a PROXY protocol header on :443 (OPNsense Layer4 SNI
@@ -26,8 +34,36 @@ con_caddy_cert_wildcards: []
 # sources connect normally.
 con_caddy_proxy_protocol_allow: []
 
-# Base URL of the authentik outpost, used by sites with "auth: authentik".
-# Example: http://10.0.10.7:9000
+# Podman networks Caddy joins to reach upstreams by container name, e.g.
+# http://gitlab:80. Empty keeps host networking. Non-empty switches Caddy to
+# these networks and publishes 80/tcp, 443/tcp and 443/udp instead: Podman
+# cannot combine host networking with other networks, and host loopback
+# upstreams (127.0.0.1) are then out of reach. Use "<name>.network" for a
+# Quadlet-managed network (systemd dependency), a plain name otherwise.
+# Example: ["gitlab_default.network"]
+con_caddy_networks: []
+
+# Raw Caddyfile lines added to the global options block, and raw top-level
+# Caddyfile content (snippets, extra site blocks) added before the sites.
+con_caddy_global_options_extra: ""
+con_caddy_extra_config: ""
+
+# Forward auth providers, referenced by a site's "auth" key. Each entry:
+#   url:           provider base URL (required)
+#   uri:           auth endpoint path on the provider (required)
+#   copy_headers:  response headers copied to the upstream
+#   proxy_paths:   path patterns proxied to the provider without auth
+#   extra_config:  raw lines inside the forward_auth block
+# "authentik" is built in from the two variables below; an entry with that
+# name here replaces it. Example (Authelia):
+#   authelia:
+#     url: http://authelia:9091
+#     uri: /api/authz/forward-auth
+#     copy_headers: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
+con_caddy_forward_auth: {}
+
+# Base URL of the authentik outpost for the built-in "authentik" provider.
+# Example: http://authentik-server:9000
 con_caddy_authentik_outpost_url: ""
 
 # Response headers copied from authentik to the upstream on forward auth.
@@ -46,16 +82,19 @@ con_caddy_authentik_copy_headers:
   - X-Authentik-Meta-Version
 
 # Sites served by this host. Keys per site (see README for details):
-#   name:             site address (required), e.g. app.a.knell.dev
+#   name:             site address (required), e.g. app.example.com
 #   aliases:          extra names for the same site
 #   upstream:         URL or list of URLs; required unless redirect is set
 #   upstream_tls:     skip_verify to accept a self-signed upstream cert
 #   lb_policy:        Caddy lb_policy when upstream is a list, e.g. ip_hash
 #   noindex:          true serves robots.txt "Disallow: /" and X-Robots-Tag
 #   headers_down:     dict of response headers to set
-#   auth:             authentik to enable forward auth
+#   auth:             forward auth provider name, e.g. authentik
 #   auth_skip_paths:  Caddy path patterns that bypass forward auth
 #   block_paths:      Caddy path patterns answered with 404
 #   responses:        list of {path, body, content_type, status} static replies
 #   redirect:         target URL; everything not matched above gets a 302
+#   acme_challenge:   dns or http; overrides con_caddy_acme_challenge
+#   extra_config:     raw Caddyfile lines inside the site block
+#   proxy_extra_config: raw lines inside the reverse_proxy block
 con_caddy_sites: []

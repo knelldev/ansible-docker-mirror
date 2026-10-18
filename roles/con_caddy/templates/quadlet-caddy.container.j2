@@ -9,9 +9,21 @@ ContainerName=caddy
 Image={{ con_caddy_image }}
 
 EnvironmentFile={{ app_path }}/caddy.env
+{% if con_caddy_networks | length == 0 %}
 # Host network: binds 80/443 directly, keeps client IPs and reaches upstreams
 # on localhost and the LAN.
 Network=host
+{% else %}
+# Podman networks: upstreams by container name. Podman cannot combine them
+# with host networking, so the ports are published. Rootful port forwarding
+# keeps client source addresses (PROXY protocol allow list still matches).
+{% for network in con_caddy_networks %}
+Network={{ network }}
+{% endfor %}
+PublishPort=80:80/tcp
+PublishPort=443:443/tcp
+PublishPort=443:443/udp
+{% endif %}
 
 Volume={{ app_path }}/conf:/etc/caddy:Z,ro
 Volume={{ app_path }}/errors:/srv/errors:Z,ro
