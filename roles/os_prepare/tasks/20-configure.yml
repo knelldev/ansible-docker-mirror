@@ -4,6 +4,9 @@
   when: os_prepare_dnf_automatic_enabled
   block:
     - name: Configure dnf-automatic.conf
+      vars:
+        dnf_automatic_upgrade_type: "{{ os_prepare_dnf_automatic_upgrade_type }}"
+        dnf_automatic_reboot: "{{ os_prepare_dnf_automatic_reboot }}"
       ansible.builtin.template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"

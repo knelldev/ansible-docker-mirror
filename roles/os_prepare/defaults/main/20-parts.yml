@@ -1,0 +1,32 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+# Switchable parts. Defaults keep re-runs on existing hosts unchanged.
+###############################################################################
+---
+# dnf-automatic (daily timer from 20-configure.yml)
+os_prepare_dnf_automatic_upgrade_type: default # default | security | ...
+os_prepare_dnf_automatic_reboot: never # never | when-changed | when-needed
+
+# Group that owns storage_base_path
+os_prepare_data_group: data
+
+# Local admin user: SSH key only, locked password, passwordless sudo
+os_prepare_admin_enabled: false
+os_prepare_admin_user: localadmin
+os_prepare_admin_pubkeys: [] # list of public key strings
+
+# First-boot unit: new machine-id and SSH host keys once per clone
+os_prepare_firstboot_enabled: false
+
+# node_exporter from EPEL with extra arguments (systemd drop-in)
+os_prepare_node_exporter_enabled: false
+os_prepare_node_exporter_package: node-exporter
+os_prepare_node_exporter_service: node_exporter
+os_prepare_node_exporter_binary: /usr/bin/node_exporter
+os_prepare_node_exporter_args: --collector.systemd
+
+# Weekly full update as a second dnf-automatic unit
+os_prepare_weekly_update_enabled: false
+os_prepare_weekly_update_oncalendar: Thu *-*-* 04:00:00
+os_prepare_weekly_update_upgrade_type: default
+os_prepare_weekly_update_reboot: when-needed

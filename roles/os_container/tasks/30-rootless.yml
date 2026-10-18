@@ -1,0 +1,68 @@
+---
+- name: Rootless Podman defaults
+  become: true
+  block:
+    - name: Set subordinate ID range for new users
+      when:
+        - os_container_subid_min is defined
+        - os_container_subid_max is defined
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?\s*{{ item.key }}\s'
+        line: "{{ item.key }}\t{{ item.value }}"
+      loop: "{{ _subid_settings | dict2items }}"
+      vars:
+        _subid_count: "{{ (os_container_subid_max | int) - (os_container_subid_min | int) + 1 }}"
+        _subid_settings:
+          SUB_UID_MIN: "{{ os_container_subid_min }}"
+          SUB_UID_MAX: "{{ os_container_subid_max }}"
+          SUB_UID_COUNT: "{{ _subid_count }}"
+          SUB_GID_MIN: "{{ os_container_subid_min }}"
+          SUB_GID_MAX: "{{ os_container_subid_max }}"
+          SUB_GID_COUNT: "{{ _subid_count }}"
+      loop_control:
+        label: "{{ item.key }}={{ item.value }}"
+
+    - name: Set default Podman network namespace for all users
+      when: os_container_default_netns is defined
+      block:
+        - name: Create containers.conf.d dir
+          ansible.builtin.file:
+            path: /etc/containers/containers.conf.d
+            state: directory
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: Write netns drop-in
+          ansible.builtin.copy:
+            content: |
+              # Managed by Ansible (os_container)
+              [containers]
+              netns = "{{ os_container_default_netns }}"
+            dest: /etc/containers/containers.conf.d/50-netns.conf
+            owner: root
+            group: root
+            mode: "0644"
+
+    # A oneshot unit instead of /etc/sysctl.d: systemd-sysctl.service skips
+    # read-only /proc/sys, as in LXC containers, where only /proc/sys/net is
+    # writable.
+    - name: Set lowest unprivileged port at boot
+      when: os_container_unprivileged_port_start is defined
+      block:
+        - name: Install unprivileged-port-start unit
+          ansible.builtin.template:
+            src: unprivileged-port-start.service.j2
+            dest: /etc/systemd/system/unprivileged-port-start.service
+            owner: root
+            group: root
+            mode: "0644"
+          register: os_container_port_unit
+
+        - name: Enable and apply unprivileged-port-start unit
+          ansible.builtin.systemd_service:
+            name: unprivileged-port-start.service
+            enabled: true
+            state: "{{ 'restarted' if os_container_port_unit.changed else 'started' }}"
+            daemon_reload: true

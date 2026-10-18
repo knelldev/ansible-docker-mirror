@@ -9,3 +9,12 @@ os_container_auto_update_schedule: Wed *-*-* 02:00:00
 
 os_container_auto_systemd_enabled: true
 os_container_auto_systemd_state: restarted
+
+# Rootless defaults (unset = no change; OS and Podman defaults stay)
+# Subordinate ID range for new users in /etc/login.defs, e.g. 10000/65533
+# os_container_subid_min: 10000
+# os_container_subid_max: 65533
+# Default network namespace for all Podman users (containers.conf.d drop-in)
+# os_container_default_netns: host
+# Lowest port unprivileged processes may bind (sysctl.d drop-in)
+# os_container_unprivileged_port_start: 80
