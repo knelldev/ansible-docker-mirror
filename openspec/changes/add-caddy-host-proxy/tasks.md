@@ -29,7 +29,31 @@
 - [ ] 2.5 Live test on one app host: start, certificate issuance, reload,
       error page, forward auth, PROXY protocol from OPNsense.
 
+## 3. Parity with con_nginx (requested 2026-10-18)
+
+Scope note: `con_caddy_networks` only joins existing networks on request; the
+role still owns no shared proxy network, so the scope boundary holds.
+
+- [x] 3.1 Free-form Caddyfile: site `extra_config`, `proxy_extra_config`,
+      `con_caddy_global_options_extra`, `con_caddy_extra_config`.
+- [x] 3.2 Optional Podman networks (`con_caddy_networks`) replacing host
+      networking, with published 80/443 (Podman rejects host plus others).
+- [x] 3.3 Generic forward auth providers (`con_caddy_forward_auth`), authentik
+      kept as a built-in preset with the old variables.
+- [x] 3.4 HTTP-01 as default or per site (`acme_challenge`); Cloudflare token
+      required only when DNS-01 is used.
+- [x] 3.5 Mark `con_nginx` deprecated.
+
 ## Verification Evidence
+
+- 2026-10-18: four rendered scenarios (legacy, all features, HTTP-01 default,
+  HTTP-01 default with one DNS-01 site) pass `caddy validate`
+  (`caddybuilds/caddy-cloudflare:2.11.7`). The legacy scenario adapts to JSON
+  identical to the previous template. Negative asserts fail as expected
+  (wildcards with http, missing token, unknown provider, authentik without
+  URL, bad challenge). `ansible-lint` 0 failures, `yamllint` and `prettier`
+  clean. Quadlet with networks and PROXY protocol in bridge mode not tested
+  on a live host.
 
 - 2026-10-17: `ansible-lint roles/con_caddy playbooks/con_caddy.yml`: 0
   failures, production profile. `yamllint`: clean. Syntax check: pass.
