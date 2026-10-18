@@ -1,0 +1,73 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Settings from other roles
+con_gitlab_external_url: "http://example.com/" # noqa var-naming[no-role-prefix]
+k3s_gitlab_agent_gitlab_external_url: "{{ con_gitlab_external_url }}"
+
+# GitLab API token (vault): Maintainer on every config project, `api` scope.
+k3s_gitlab_agent_api_token: __REQUIRED__
+# The token travels to the GitLab API; verify its certificate by default.
+k3s_gitlab_agent_api_validate_certs: true
+
+# KAS address agentk dials. The default derives the main-domain form
+# wss://<host>/-/kubernetes-agent/ from the GitLab URL (ws:// for http).
+# Override it in the inventory when KAS has its own host, for example:
+#   k3s_gitlab_agent_kas_address: "wss://kas.gitlab.knell.dev"
+k3s_gitlab_agent_kas_address: >-
+  {{
+    ('wss' if (k3s_gitlab_agent_gitlab_external_url | urlsplit('scheme')) == 'https' else 'ws')
+    ~ '://'
+    ~ (k3s_gitlab_agent_gitlab_external_url | urlsplit('netloc'))
+    ~ '/-/kubernetes-agent/'
+  }}
+# PEM of a private CA for KAS. Empty: system trust (public certificates).
+k3s_gitlab_agent_kas_ca_cert: ""
+
+# Kubernetes settings
+k3s_gitlab_agent_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+k3s_gitlab_agent_helm_binary_path: /usr/local/bin/helm
+
+# Pinned chart and agentk image. Keep the image within one minor version of
+# the GitLab server (major.minor).
+k3s_gitlab_agent_chart_version: "2.33.0"
+k3s_gitlab_agent_image_tag: "v19.5.0"
+k3s_gitlab_agent_resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# Replicas. Automatic mode uses one replica on one schedulable node and two
+# from two nodes on, with soft anti-affinity. A number overrides.
+k3s_gitlab_agent_replicas_auto: true
+k3s_gitlab_agent_replicas: null
+k3s_gitlab_agent_replicas_max: 2
+
+# One-shot token rotation for every listed agent: new token, Secret update,
+# rollout, then revoke the agent's other active tokens. Disable after use.
+k3s_gitlab_agent_rotate_token: false
+
+# Deployment health
+k3s_gitlab_agent_helm_wait: true
+k3s_gitlab_agent_helm_timeout: "5m"
+k3s_gitlab_agent_health_check_retries: 18
+k3s_gitlab_agent_health_check_delay: 10
+k3s_gitlab_agent_failure_log_lines: 100
+
+###############################################################################
+# Agents
+###############################################################################
+# Each item:
+#   name:       (required) agent name in GitLab, Helm release name; lowercase
+#               letters, digits and dashes, at most 50 characters
+#   project:    (required) config project, path (group/project) or numeric id
+#   namespace:  (optional) namespace agentk runs in (default gitlab-agent-<name>)
+#   targets:    (required) namespaces the agent may act in; each item has
+#     namespace:    target namespace (created when missing)
+#     rules:        RBAC rules for a Role in that namespace, or
+#     cluster_role: name of a ClusterRole bound by a RoleBinding there
+#
+# On GitLab Free every project authorized in the agent's ci_access gets all of
+# the agent's rights. Use one agent per project (trust boundary).
+k3s_gitlab_agent_config_list: []

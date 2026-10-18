@@ -98,6 +98,7 @@ Individual role [`AGENTS.md`](AGENTS.md) files exist for all roles:
 - **con_nginx/** - Nginx reverse proxy
 - **con_semaphore/** - Semaphore CI/CD
 - **con_watchtower/** - Watchtower auto-update
+- **k3s_gitlab_agent/** - GitLab agent for Kubernetes (agentk) on K3s
 - **k3s_gitlab_runner/** - GitLab Runner on K3s
 - **os_container/** - OS container runtime setup
 - **os_gitlab_runner/** - GitLab Runner installation

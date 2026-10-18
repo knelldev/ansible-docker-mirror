@@ -1,0 +1,14 @@
+---
+# The role keeps no files on the target (the token Secret is the only state),
+# so app_path and app_user do not apply.
+app_name: "{{ role_name.split('_')[1:] | join('_') }}" # noqa var-naming[no-role-prefix]
+
+k3s_gitlab_agent_api_url: >-
+  {{ k3s_gitlab_agent_gitlab_external_url | regex_replace('/+$', '') }}/api/v4
+
+# Kubernetes name rules: agent name is used in namespace, Secret, Role and
+# release names, so keep gitlab-agent-<name> within 63 characters.
+k3s_gitlab_agent_name_pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+k3s_gitlab_agent_name_max_length: 50
+k3s_gitlab_agent_token_id_annotation: gitlab.com/agent-token-id
+k3s_gitlab_agent_agent_id_annotation: gitlab.com/agent-id
