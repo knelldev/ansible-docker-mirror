@@ -46,7 +46,7 @@ exists on the node before creating anything (pve3 has none).
 ### Baseline order (inside the build CT, as root with the build key)
 
 1. `lxc_base` pre-tasks: group `data` (needed by `os_prepare`, which sets
-   `/data` to `root:data` but creates no group), `ops` user, sshd.
+   `/data` to `root:data` but creates no group), `localadmin` user, sshd.
 2. `os_prepare` with `os_prepare_packages` overridden without
    `qemu-guest-agent`, and `os_prepare_dnf_automatic_upgrade_type: security`.
 3. `os_container` with `os_container_auto_update_schedule` set into the
@@ -71,7 +71,7 @@ exists on the node before creating anything (pve3 has none).
 
 ### `lxc_base` contents
 
-- `ops`: SSH key only, locked password, sudo `NOPASSWD`, used by automation
+- `localadmin`: SSH key only, locked password, sudo `NOPASSWD`, used by automation
   and as fallback when authentik is down.
 - sshd drop-in: `PermitRootLogin no`, `PasswordAuthentication no`.
 - First boot: `ct-firstboot.service`, `Before=sshd.service`, runs once per
@@ -99,7 +99,7 @@ The baseline must keep working for normal VMs and other machines. So:
 - Changes to `os_prepare` and `os_container` are variables or guards whose
   defaults keep today's behavior on every existing host.
 - Generic parts move into a host-agnostic role (working name `os_base`):
-  `ops` user, sshd hardening, first-boot unit, node_exporter, weekly update
+  `localadmin` user, sshd hardening, first-boot unit, node_exporter, weekly update
   window. VMs and the later VM template use it too.
 - `lxc_base` keeps only what is container-specific: subordinate ID range
   inside the 65536-ID map, dropping `qemu-guest-agent`, the reset before
@@ -117,7 +117,7 @@ would fail. The template sets the range (proposal: 10000–65533, below
 
 ### Clone test
 
-Clone `ct-alma-10-dmz` to `ct-test-alma-10`, start, connect as `ops`, check:
+Clone `ct-alma-10-dmz` to `ct-test-alma-10`, start, connect as `localadmin`, check:
 host keys and machine-id differ from the build CT's recorded values, default
 route and DNS lookup work, `sshd` active, a throwaway user runs
 `podman run --rm` of a small image, `node_exporter` answers on 9100. Only the
@@ -133,9 +133,9 @@ dmz template is tested; int differs only in the bridge.
 ## Open Questions
 
 - CT-Q1 (Semaphore layout): which inventory, environment and key store hold
-  the Proxmox token, build key and `ops` key; one Semaphore task or one per
+  the Proxmox token, build key and `localadmin` key; one Semaphore task or one per
   template?
-- CT-Q2 (key location): where the build and `ops` key pairs live (Vaultwarden,
+- CT-Q2 (key location): where the build and `localadmin` key pairs live (Vaultwarden,
   Semaphore key store, ansible-vault in an inventory repo), and who rotates
   them.
 - CT-Q3 (reachability): can the Semaphore runner reach DHCP addresses on

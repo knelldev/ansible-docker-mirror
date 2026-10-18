@@ -23,7 +23,7 @@ current templates and replaces them only after a test clone passes.
   - tests a clone of the new template, then destroys the test clone;
   - on failure deletes the new templates and keeps the old ones; on success
     deletes the previous templates unless a clone task from them is running.
-- Add `roles/lxc_base/` (runs inside the CT over SSH): local admin `ops`,
+- Add `roles/lxc_base/` (runs inside the CT over SSH): local admin `localadmin`,
   sshd hardening, a first-boot unit, node_exporter, the weekly update window,
   the subordinate ID range, and the reset before templating.
 - Reuse `os_prepare` and `os_container` in the baseline, with two small
@@ -77,7 +77,7 @@ current templates and replaces them only after a test clone passes.
   `ct-`, type `lxc` and recorded VMID checks before every destroy.
 - Risk: rootful Podman overlay storage inside an unprivileged CT; covered by
   the clone test.
-- Risk: the token secret and the build/ops private keys live in Semaphore.
+- Risk: the token secret and the build/localadmin private keys live in Semaphore.
 
 Approval status: scope decided with the user on 2026-10-18 (session in
 `lab_01_migrations`); plan created only, not approved for implementation.

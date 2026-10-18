@@ -13,7 +13,7 @@
 - [ ] 1.3 `os_prepare`: add `os_prepare_dnf_automatic_upgrade_type`
       (default `default`). `os_container`: SELinux guard on the two
       `semanage`/`restorecon` tasks.
-- [ ] 1.4 Create `roles/lxc_base/` from the skeleton: `ops`, sshd, first-boot
+- [ ] 1.4 Create `roles/lxc_base/` from the skeleton: `localadmin`, sshd, first-boot
       unit, node_exporter (decide source), weekly update window (check
       `reboot = when-needed` on Alma 10), subuid range, reset task file.
 - [ ] 1.5 Create `roles/pve_ct_template/` and `playbooks/pve_ct_template.yml`:
