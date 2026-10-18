@@ -62,7 +62,7 @@ task files in `os_prepare`.
 
 | Role | Runs on | Does | Switches and values |
 |---|---|---|---|
-| `os_prepare` (extended) | any EL host | as today, plus admin user, first-boot identity unit, node_exporter, weekly full-update window | `os_prepare_admin_enabled` (default off, so re-running on existing hosts changes nothing), `os_prepare_admin_user` (default `localadmin`), `os_prepare_admin_pubkeys`; `os_prepare_firstboot_enabled`, `os_prepare_node_exporter_enabled`, `os_prepare_weekly_update_enabled` (default on, harmless), `os_prepare_weekly_update_oncalendar` (`Thu 04:00`), `os_prepare_weekly_update_reboot` (`when-needed`); `os_prepare_dnf_automatic_upgrade_type` (default `default`) |
+| `os_prepare` (extended) | any EL host | as today, plus admin user, first-boot identity unit, node_exporter, weekly full-update window | `os_prepare_admin_enabled` (default off, so re-running on existing hosts changes nothing), `os_prepare_admin_user` (default `localadmin`), `os_prepare_admin_pubkeys`; `os_prepare_firstboot_enabled`, `os_prepare_node_exporter_enabled`, `os_prepare_weekly_update_enabled` (default off: it adds reboots, so existing hosts keep today's behavior; the template playbook turns it on), `os_prepare_weekly_update_oncalendar` (`Thu 04:00`), `os_prepare_weekly_update_reboot` (`when-needed`); `os_prepare_dnf_automatic_upgrade_type` (default `default`) |
 | `os_container` (changed) | hosts that run Podman | as today | new `os_container_subid_min`/`_max` (default unset = OS defaults); `os_container_default_netns` (default unset = Podman's default); `os_container_unprivileged_port_start` (default unset = kernel default 1024); SELinux guard |
 | `os_template_reset` (new) | only a guest about to become a template (CT now, VM template later) | removes identity, keys, logs, caches; own role so it never runs on a live host by accident | `os_template_reset_remove_paths`, `os_template_reset_remove_root_keys` |
 | `pve_ct_template` (new) | localhost, Proxmox API | download, build CT, template, int clone, test, swap | node, bridges, template names, pool, storages, sizes, cores, memory, features: all variables, defaults = the decisions in `lab_01_migrations` |
@@ -163,6 +163,13 @@ elsewhere (CT-Q5).
   `os_prepare_dnf_automatic_reboot`, default `never`, the same effective
   behavior as before.
 - `os_prepare`: creates group `data` before `/data` gets `root:data`.
+- `os_prepare`: the same template also had `download_updates` and
+  `apply_updates` under `[download]`/`[base]`; dnf 4 reads them in
+  `[commands]`, where they now are. Hosts that ran `os_prepare` with
+  `dnf-automatic.timer` start applying updates as the file always intended
+  (before, dnf 4 used its documented default `apply_updates = False`,
+  [dnf automatic docs](https://dnf.readthedocs.io/en/latest/automatic.html);
+  not checked on a host). User decision: keep this fix (CT-Q6).
 - `os_prepare` has no SELinux or firewall tasks. `30-customize.yml` runs an
   `echo`; left as is. New parts go in their own numbered task files, each
   behind its switch.
@@ -264,3 +271,6 @@ after its own test passes, every older `ct-alma-10-*` template it recorded.
 - CT-Q5 (diff baseline): the implementation diffs against the stock image,
   not the previous template (see Package diff). Keep, or store the full list
   somewhere readable to diff against the previous template?
+- CT-Q6 (dnf-automatic fix on existing hosts): the corrected template makes
+  existing `os_prepare` hosts apply daily updates (all types) on their next
+  run. Keep, or default `apply_updates` to the old effective `no`?
