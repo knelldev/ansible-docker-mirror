@@ -46,34 +46,37 @@ exists on the node before creating anything (pve3 has none).
 ### Role split (user, 2026-10-18: flexible, configured by variables)
 
 Every role works on any EL host; what makes a CT template is the playbook's
-variables, not a CT-only role. No `lxc_base`.
+variables, not a CT-only role. No `lxc_base`, no separate `os_base`: every
+host that gets the base also gets `os_prepare`, so the new parts are switchable
+task files in `os_prepare`.
 
 | Role | Runs on | Does | Switches and values |
 |---|---|---|---|
-| `os_base` (new) | any EL host: CT, VM, bare metal | local admin, sshd hardening, first-boot identity unit, node_exporter, weekly full-update window | `os_base_admin_enabled`, `os_base_admin_user` (default `localadmin`), `os_base_admin_pubkeys`; `os_base_sshd_enabled`; `os_base_firstboot_enabled`; `os_base_node_exporter_enabled`, `os_base_node_exporter_collectors`; `os_base_weekly_update_enabled`, `os_base_weekly_update_oncalendar` (default `Thu 04:00`), `os_base_weekly_update_reboot` (default `when-needed`) |
-| `os_prepare` (changed) | as today | packages, dnf-automatic | new `os_prepare_dnf_automatic_upgrade_type` (default `default`); packages list already a variable |
-| `os_container` (changed) | as today | Podman, graphroot, auto-update | new `os_container_subid_min`/`_max` (default unset = OS defaults); SELinux guard |
-| `os_template_reset` (new) | any guest about to become a template (CT now, VM template later) | removes identity, keys, logs, caches | `os_template_reset_remove_paths`, `os_template_reset_remove_root_keys` (list); defaults cover the list below |
+| `os_prepare` (extended) | any EL host | as today, plus admin user, first-boot identity unit, node_exporter, weekly full-update window | `os_prepare_admin_enabled` (default off, so re-running on existing hosts changes nothing), `os_prepare_admin_user` (default `localadmin`), `os_prepare_admin_pubkeys`; `os_prepare_firstboot_enabled`, `os_prepare_node_exporter_enabled`, `os_prepare_weekly_update_enabled` (default on, harmless), `os_prepare_weekly_update_oncalendar` (`Thu 04:00`), `os_prepare_weekly_update_reboot` (`when-needed`); `os_prepare_dnf_automatic_upgrade_type` (default `default`) |
+| `os_container` (changed) | hosts that run Podman | as today | new `os_container_subid_min`/`_max` (default unset = OS defaults); SELinux guard |
+| `os_template_reset` (new) | only a guest about to become a template (CT now, VM template later) | removes identity, keys, logs, caches; own role so it never runs on a live host by accident | `os_template_reset_remove_paths`, `os_template_reset_remove_root_keys` |
 | `pve_ct_template` (new) | localhost, Proxmox API | download, build CT, template, int clone, test, swap | node, bridges, template names, pool, storages, sizes, cores, memory, features: all variables, defaults = the decisions in `lab_01_migrations` |
 
-Defaults are on for each `os_base` part; existing hosts are unaffected
-because no current playbook includes `os_base` or `os_template_reset`.
-A VM later uses the same roles with different values (e.g. keep
-`qemu-guest-agent`, no subid range).
+No sshd or firewall changes (user, 2026-10-18): RHEL defaults stay
+(`PermitRootLogin prohibit-password`, crypto policy DEFAULT; not checked on
+the Alma 10 image); root has no password or key after the reset, `localadmin`
+has a locked password. Password/keyboard-interactive SSH may matter for the
+authentik agent trial; close it only if the trial shows a need. firewalld is
+left as the image ships it; filtering is the Proxmox firewall's job. If the
+image has firewalld active, the clone test (node_exporter on 9100) shows it.
 
 ### Baseline order (inside the build CT, as root with the build key)
 
 `playbooks/pve_ct_template.yml` sets the CT values in one vars block:
 
-1. `os_base`: `localadmin`, sshd, first-boot unit, node_exporter, weekly
-   window; also creates group `data` (needed by `os_prepare`, which sets
-   `/data` to `root:data` but creates no group).
-2. `os_prepare` with `os_prepare_packages` without `qemu-guest-agent` and
-   `os_prepare_dnf_automatic_upgrade_type: security`.
-3. `os_container` with `os_container_auto_update_schedule` Thu 04:30 and
+1. `os_prepare` with `os_prepare_admin_enabled: true`,
+   `os_prepare_packages` without `qemu-guest-agent`,
+   `os_prepare_dnf_automatic_upgrade_type: security`; also creates group
+   `data` (it sets `/data` to `root:data` but creates no group today).
+2. `os_container` with `os_container_auto_update_schedule` Thu 04:30 and
    `os_container_subid_min: 10000`, `_max: 65533`. Graphroot
    `/data/containers/storage` lands on `mp0`.
-4. `os_template_reset` as the last step.
+3. `os_template_reset` as the last step.
 
 ### Changes to existing roles
 
@@ -89,14 +92,14 @@ A VM later uses the same roles with different values (e.g. keep
   precondition and also covers other hosts without SELinux.
 - `os_container`: subid range writes `SUB_UID_MIN/MAX`, `SUB_GID_MIN/MAX` in
   `/etc/login.defs` only when the variables are set.
-- `os_prepare` has no SELinux tasks. `30-customize.yml` runs an `echo`; left
-  as is.
+- `os_prepare` has no SELinux or firewall tasks. `30-customize.yml` runs an
+  `echo`; left as is. New parts go in their own numbered task files, each
+  behind its switch.
 
-### `os_base` contents
+### New `os_prepare` parts
 
 - Admin user (`localadmin`): SSH key only, locked password, sudo `NOPASSWD`,
   used by automation and as fallback when authentik is down.
-- sshd drop-in: `PermitRootLogin no`, `PasswordAuthentication no`.
 - First boot: `firstboot-identity.service`, `Before=sshd.service`, runs once
   per clone (marker `/var/lib/firstboot-identity.done`): new machine-id,
   `ssh-keygen -A`. Reason: Proxmox keeps the template's host keys and writes

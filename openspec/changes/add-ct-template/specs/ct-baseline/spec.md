@@ -3,14 +3,14 @@
 ### Requirement: Admin access
 
 The baseline SHALL provide a local user `localadmin` with SSH key login, no usable
-password and passwordless sudo, and SHALL deny root login and password
-authentication over SSH.
+password and passwordless sudo, and SHALL leave the distribution's sshd and
+firewall defaults unchanged.
 
 #### Scenario: Login on a clone
 
 - **WHEN** a clone of the template starts
 - **THEN** `localadmin` can log in with its key and run sudo
-- **AND** root login and password login are refused
+- **AND** root cannot log in
 
 ### Requirement: Unique clone identity
 

@@ -2,7 +2,7 @@
 
 New homelab services run in Proxmox LXC containers (migration repo
 `lab_01_migrations`, change `idm`). Each container needs the same AlmaLinux 10
-baseline: admin access, hardened sshd, updates, Podman and node_exporter.
+baseline: admin access, updates, Podman and node_exporter.
 Building that by hand drifts and goes stale. A scheduled build keeps two
 current templates and replaces them only after a test clone passes.
 
@@ -23,9 +23,9 @@ current templates and replaces them only after a test clone passes.
   - tests a clone of the new template, then destroys the test clone;
   - on failure deletes the new templates and keeps the old ones; on success
     deletes the previous templates unless a clone task from them is running.
-- Add `roles/os_base/` (any EL host, each part switchable): local admin
-  `localadmin`, sshd hardening, a first-boot identity unit, node_exporter,
-  the weekly update window.
+- Extend `roles/os_prepare/` with switchable parts (any EL host): local admin
+  `localadmin` (default off), a first-boot identity unit, node_exporter, the
+  weekly update window. No sshd or firewall changes.
 - Add `roles/os_template_reset/` (any guest before templating, VM template
   later): the reset before templating.
 - All CT-specific values (sizes, bridges, names, subid range, packages) live
@@ -54,7 +54,8 @@ current templates and replaces them only after a test clone passes.
 
 - New roles, playbook, role README/AGENTS, `roles/AGENTS.md` index, root
   README playbook list, `TECHSTACK.md` collection row.
-- `os_prepare`: new variable, default keeps today's behavior.
+- `os_prepare`: new switchable parts and variables; defaults keep re-runs on
+  existing hosts safe (admin user off).
 - `os_container`: SELinux tasks skip where SELinux is not enabled; subid
   range only when set.
 - External: Proxmox API (token from Semaphore secrets), `download.proxmox.com`

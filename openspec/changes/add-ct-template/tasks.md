@@ -13,9 +13,9 @@
 - [ ] 1.3 `os_prepare`: add `os_prepare_dnf_automatic_upgrade_type`
       (default `default`). `os_container`: SELinux guard on the two
       `semanage`/`restorecon` tasks; optional `os_container_subid_min/max`.
-- [ ] 1.4 Create `roles/os_base/` from the skeleton, one switch per part:
-      admin user, sshd, first-boot unit, node_exporter (decide source),
-      weekly update window (check `reboot = when-needed` on Alma 10).
+- [ ] 1.4 Extend `roles/os_prepare/`, one switch per part: admin user,
+      first-boot unit, node_exporter (decide source), weekly update window
+      (check `reboot = when-needed` on Alma 10).
       Create `roles/os_template_reset/` with the reset list as a variable.
 - [ ] 1.5 Create `roles/pve_ct_template/` and `playbooks/pve_ct_template.yml`:
       guard, download, build CT, baseline, template, int clone, test, swap,
