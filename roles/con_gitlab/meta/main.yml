@@ -1,6 +1,6 @@
 galaxy_info:
   author: knelldev
-  description: your role description
+  description: GitLab (CE or EE) via Podman Quadlet, with registry, pages, KAS and SSO options.
   # company: your company (optional)
 
   # If the issue tracker for your role is not on github, uncomment the
