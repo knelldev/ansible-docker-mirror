@@ -24,7 +24,7 @@ not additional general project guides.
 - Linux preparation and Podman-based application roles
 - K3s cluster and GitLab Runner automation
 - Windows preparation and GitLab Runner automation
-- Proxmox VM cloning
+- Proxmox VM cloning and LXC template builds
 - A rootless Ansible controller image
 
 ## Repository Layout
@@ -78,6 +78,7 @@ inventory handling, and Semaphore configuration, see
 - `win_container.yml`, `win_gitlab_runner.yml`, and
   `win_gitlab_runner_only.yml` for Windows targets
 - `pve_vm_clone.yml` for Proxmox VM cloning
+- `pve_ct_template.yml` for the scheduled Proxmox LXC template build
 - `ping.yml` and `ping_local.yml` for connectivity and callback checks
 
 ## Development

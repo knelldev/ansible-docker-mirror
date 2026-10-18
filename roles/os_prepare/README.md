@@ -1,38 +1,59 @@
-Role Name
-=========
+# os_prepare
 
-A brief description of the role goes here.
+Base preparation for EL hosts: packages, `/data` with group `data`,
+dnf-automatic, journald and logrotate settings, a custom script, and
+switchable parts for local admin access, first-boot identity, node_exporter
+and a weekly update window.
 
-Requirements
-------------
+## Requirements
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- Ansible core 2.17 or newer, no extra collections.
+- EL 9 or EL 10 with EPEL reachable.
 
-Role Variables
---------------
+## Role variables
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+`defaults/main/10-os.yml`: `os_prepare_packages`,
+`os_prepare_dnf_automatic_enabled`, logrotate and journald settings.
+`defaults/main/30-customize.yml`: `os_prepare_custom_script`.
 
-Dependencies
-------------
+Switchable parts (`defaults/main/20-parts.yml`); all new parts are off by
+default, so re-runs on existing hosts change nothing:
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+| Variable                                | Default              | Meaning                                                                                    |
+| --------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `os_prepare_dnf_automatic_upgrade_type` | `default`            | daily dnf-automatic: `default` (all) or `security`                                         |
+| `os_prepare_dnf_automatic_reboot`       | `never`              | daily: `never`, `when-changed`, `when-needed`                                              |
+| `os_prepare_data_group`                 | `data`               | group of `storage_base_path`                                                               |
+| `os_prepare_admin_enabled`              | `false`              | create the admin user                                                                      |
+| `os_prepare_admin_user`                 | `localadmin`         | key-only login, locked password, sudo `NOPASSWD`                                           |
+| `os_prepare_admin_pubkeys`              | `[]`                 | required when enabled                                                                      |
+| `os_prepare_firstboot_enabled`          | `false`              | `firstboot-identity.service`: new machine-id and SSH host keys once per clone, before sshd |
+| `os_prepare_node_exporter_enabled`      | `false`              | EPEL `node-exporter`, unit `node_exporter`, args `--collector.systemd`                     |
+| `os_prepare_weekly_update_enabled`      | `false`              | second dnf-automatic unit with its own config                                              |
+| `os_prepare_weekly_update_oncalendar`   | `Thu *-*-* 04:00:00` | weekly timer                                                                               |
+| `os_prepare_weekly_update_upgrade_type` | `default`            | weekly: all updates                                                                        |
+| `os_prepare_weekly_update_reboot`       | `when-needed`        | weekly reboot policy                                                                       |
 
-Example Playbook
-----------------
+## Dependencies
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+None.
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+## Example playbook
 
-License
--------
+```yaml
+- hosts: servers
+  roles:
+    - role: os_prepare
+      vars:
+        os_prepare_admin_enabled: true
+        os_prepare_admin_pubkeys:
+          - ssh-ed25519 AAAA... localadmin
+```
 
-BSD
+## License
 
-Author Information
-------------------
+MIT. See the collection repository license.
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+## Author
+
+knelldev
