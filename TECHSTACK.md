@@ -1,6 +1,6 @@
 # Project Tech Stack & Blueprint Matrix
 
-> Binding reference for the `ansible-docker` workspace. All new roles, playbooks, collections, and CI artifacts MUST conform to the contracts below. **Version:** `v1.1.0` · **Verified:** 2026-08-13.
+> Binding reference for the `ansible-docker` workspace. All new roles, playbooks, collections, and CI artifacts MUST conform to the contracts below. **Version:** `v1.2.0` · **Verified:** 2026-10-18.
 >
 > See also: [AGENTS.md](./AGENTS.md) (root DOX rail) · [.github/prompts/techstack.prompt.md](./.github/prompts/techstack.prompt.md) (maintenance prompt) · [.github/prompts/techstack.template.md](./.github/prompts/techstack.template.md) (template source)
 
@@ -26,7 +26,7 @@
 | ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `community.general`                      | Used by `roles/pve_vm_clone`; not declared in `collections/requirements.yml` | Proxmox modules                | [community.general index](https://docs.ansible.com/projects/ansible/latest/collections/community/general/index.html) |
 | `community.docker` / `containers.podman` | Not declared or used by repository YAML                                      | No current repository use      | [community.docker](https://docs.ansible.com/projects/ansible/latest/collections/community/docker/index.html)         |
-| `community.proxmox`                      | Commented out in `collections/requirements.yml`; not used                    | No current repository use      | —                                                                                                                    |
+| `community.proxmox`                      | `>=2.0.0` in `collections/requirements.yml`; observed 2.0.0                  | LXC template build (`roles/pve_ct_template`) | [community.proxmox index](https://docs.ansible.com/projects/ansible/latest/collections/community/proxmox/index.html) |
 
 ### Target runtime infrastructure
 
@@ -37,7 +37,7 @@
   - Bare-metal / VPS Linux (Rocky / Alma / Debian family) — `roles/os_prepare`, `roles/os_vps`, `roles/os_mount`.
   - K3s clusters — `roles/os_k3s`, `roles/k3s_gitlab_runner`.
   - Windows hosts — `roles/win_prepare`, `roles/win_container`, `roles/win_gitlab_runner`.
-  - Proxmox VE — `roles/pve_vm_clone` (collection currently disabled).
+  - Proxmox VE — `roles/pve_vm_clone` (`community.general`), `roles/pve_ct_template` (`community.proxmox`).
   - GitLab self-hosted — `roles/con_gitlab`.
 
 ### CI/CD
@@ -215,6 +215,12 @@ Each `roles/<role>/README.md` MUST cover, in order:
 ## Changelog
 
 All notable changes to this file are documented here. Format follows [keep-a-changelog](https://keepachangelog.com/).
+
+### v1.2.0 — 2026-10-18
+
+**Changed**
+
+- Enabled `community.proxmox` `>=2.0.0` for `roles/pve_ct_template` (change `add-ct-template`).
 
 ### v1.1.0 — 2026-08-13
 
