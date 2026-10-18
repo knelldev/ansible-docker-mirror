@@ -7,6 +7,18 @@
     daemon_reload: true
   when: con_caddy_systemd_service_state == 'started'
 
+# A changed conf.d file alone skips the template validation, so validate the
+# active Caddyfile with it before the reload.
+- name: Validate caddy config
+  become: true
+  ansible.builtin.command: >-
+    podman run --rm --network none --security-opt label=disable
+    --env-file {{ app_path }}/caddy.env
+    -v {{ app_path }}/conf:/etc/caddy:ro
+    {{ con_caddy_image }}
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  changed_when: false
+
 - name: Reload caddy
   become: true
   ansible.builtin.systemd_service:

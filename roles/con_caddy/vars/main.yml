@@ -11,6 +11,7 @@ con_caddy_storage_extra_dirs:
   - name: conf
   - name: errors
   - name: data
+  - name: conf/conf.d
   - name: config
   - name: logs
     mode: "0750"

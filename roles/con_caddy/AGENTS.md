@@ -18,6 +18,10 @@ certificates via Podman Quadlet. Replaces the deprecated `con_nginx`.
 - Global DNS-01 uses `cert_issuer`, not `acme_dns`: `acme_dns` would also
   force DNS-01 on per-site `http` issuers.
 - Existing site and authentik variables stay backward compatible.
+- Default security headers use `header ?Name`, so upstream headers win.
+- `handle_errors` covers only errors Caddy raises; never intercept upstream or
+  forward auth responses.
+- `files/error.html` is a Caddy template; escape literal `{{` as `{{ "{{" }}`.
 - The image stays pinned to a full version with the Cloudflare DNS module; no
   repository-owned Caddy build.
 - The Caddyfile is validated with the pinned image before it replaces the

@@ -1,37 +1,58 @@
 <!doctype html>
+<!-- Rendered by the Caddy templates directive in handle_errors. -->
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>Service unavailable</title>
+    <title>Error {{ placeholder "http.error.status_code" }}</title>
+    {{- if eq (printf "%v" (placeholder "http.error.status_code")) "502" "503" "504" }}
+    <meta http-equiv="refresh" content="5" />
+    {{- end }}
     <style>
       body {
+        background-color: #222;
+        color: #eee;
+        font-family: monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
         margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        font-family: system-ui, sans-serif;
-        background: #f5f5f4;
-        color: #1c1917;
       }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #1c1917;
-          color: #e7e5e4;
-        }
-      }
-      main {
-        max-width: 32rem;
-        padding: 1rem;
+
+      .container {
         text-align: center;
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #333;
+      }
+
+      h1 {
+        font-size: 2.5em;
+        margin-bottom: 0.5em;
+      }
+
+      pre {
+        font-size: 1.2em;
+        white-space: pre-wrap;
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Service unavailable</h1>
-      <p>This service is down or restarting. Please try again in a few minutes.</p>
-    </main>
+    <div class="container">
+      <h1>Error {{ placeholder "http.error.status_code" }}</h1>
+      <h2>{{ placeholder "http.error.status_text" | default "Something goes wrong" }}</h2>
+      <br />
+      <pre>
+ )      (\_
+((    _/{  "-;
+ )).-' {{ "{{" }} ;'`
+( (  ;._ \
+        </pre>
+      <p>{{ .Host | html }}{{ .OriginalReq.URL.RequestURI | html }}</p>
+    </div>
+    <p>{{ now | date "2006-01-02 15:04:05 MST" }}</p>
   </body>
 </html>

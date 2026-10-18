@@ -43,6 +43,9 @@ role still owns no shared proxy network, so the scope boundary holds.
 - [x] 3.4 HTTP-01 as default or per site (`acme_challenge`); Cloudflare token
       required only when DNS-01 is used.
 - [x] 3.5 Mark `con_nginx` deprecated.
+- [x] 3.6 Defaults for the common case: security headers, noindex
+      (`con_caddy_noindex: true`), error page for all Caddy errors (the
+      `con_nginx` page), CORS origins, `conf.d/*.caddy` imports.
 
 ## Verification Evidence
 
@@ -54,6 +57,12 @@ role still owns no shared proxy network, so the scope boundary holds.
   URL, bad challenge). `ansible-lint` 0 failures, `yamllint` and `prettier`
   clean. Quadlet with networks and PROXY protocol in bridge mode not tested
   on a live host.
+- 2026-10-18 (3.6): four scenarios plus a `conf.d` snippet pass
+  `caddy validate`; the legacy scenario differs from the previous render only
+  in error handling, the `conf.d` import, security headers and noindex. A
+  local Caddy run serves the error page for 404 and 502 (status text, escaped
+  path, refresh on 502) and passes an upstream 403 and its `X-Frame-Options`
+  through. `ansible-lint` 0 failures.
 
 - 2026-10-17: `ansible-lint roles/con_caddy playbooks/con_caddy.yml`: 0
   failures, production profile. `yamllint`: clean. Syntax check: pass.

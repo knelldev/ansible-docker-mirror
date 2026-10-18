@@ -48,6 +48,25 @@ con_caddy_networks: []
 con_caddy_global_options_extra: ""
 con_caddy_extra_config: ""
 
+# Local files copied into <app_path>/conf/conf.d; the Caddyfile imports every
+# conf.d/*.caddy before the sites. Use them for snippets a site imports
+# through extra_config, or for whole site blocks. Example: ["files/sso.caddy"]
+con_caddy_conf_files: []
+
+# Default for the per-site noindex key: robots.txt "Disallow: /" and
+# X-Robots-Tag on every site. Set false for public sites.
+con_caddy_noindex: true
+
+# Security headers on every site, set only when the upstream did not send the
+# header itself. A site's security_headers dict overrides single entries (an
+# empty value drops one); security_headers: false disables them for the site.
+con_caddy_security_headers:
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
+  Referrer-Policy: strict-origin-when-cross-origin
+
 # Forward auth providers, referenced by a site's "auth" key. Each entry:
 #   url:           provider base URL (required)
 #   uri:           auth endpoint path on the provider (required)
@@ -87,8 +106,12 @@ con_caddy_authentik_copy_headers:
 #   upstream:         URL or list of URLs; required unless redirect is set
 #   upstream_tls:     skip_verify to accept a self-signed upstream cert
 #   lb_policy:        Caddy lb_policy when upstream is a list, e.g. ip_hash
-#   noindex:          true serves robots.txt "Disallow: /" and X-Robots-Tag
+#   noindex:          robots.txt "Disallow: /" and X-Robots-Tag; default
+#                     con_caddy_noindex
 #   headers_down:     dict of response headers to set
+#   security_headers: dict merged over con_caddy_security_headers, or false
+#   cors_origins:     allowed CORS origins, e.g. ["https://app.example.com"]
+#   cors_methods:     allowed CORS methods (default GET to OPTIONS)
 #   auth:             forward auth provider name, e.g. authentik
 #   auth_skip_paths:  Caddy path patterns that bypass forward auth
 #   block_paths:      Caddy path patterns answered with 404

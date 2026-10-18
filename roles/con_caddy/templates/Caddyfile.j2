@@ -35,9 +35,12 @@
 		output file /var/log/caddy/access.log
 		format json
 	}
-	handle_errors 502 503 504 {
+	# Errors raised by Caddy itself (unreachable upstream, blocked path, ...).
+	# Upstream responses and forward auth replies pass through unchanged.
+	handle_errors {
 		root * /srv/errors
 		rewrite * /error.html
+		templates
 		file_server {
 			status {err.status_code}
 		}
@@ -47,8 +50,12 @@
 
 {{ con_caddy_extra_config | trim }}
 {% endif %}
+
+# Custom snippets and site blocks dropped into <app_path>/conf/conf.d.
+import /etc/caddy/conf.d/*.caddy
 {% for site in con_caddy_sites %}
 {% set challenge = site.acme_challenge | default(con_caddy_acme_challenge) %}
+{% set security_headers = {} if site.security_headers | default({}) is sameas false else con_caddy_security_headers | combine(site.security_headers | default({})) %}
 
 {{ ([site.name] + site.aliases | default([])) | join(', ') }} {
 	import common
@@ -62,10 +69,36 @@
 {% endif %}
 	}
 {% endif %}
+{% for key, value in security_headers.items() if value is not none and value | string | length > 0 %}
+	header ?{{ key }} "{{ value }}"
+{% endfor %}
 {% for key, value in (site.headers_down | default({})).items() %}
 	header {{ key }} "{{ value }}"
 {% endfor %}
-{% if site.noindex | default(false) %}
+{% if site.cors_origins | default([]) | length > 0 %}
+	@cors_origin {
+{% for origin in site.cors_origins %}
+		header Origin {{ origin }}
+{% endfor %}
+	}
+	header @cors_origin {
+		defer
+		Access-Control-Allow-Origin "{http.request.header.Origin}"
+		Access-Control-Allow-Methods "{{ site.cors_methods | default(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) | join(', ') }}"
+		Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
+		Vary Origin
+	}
+	@cors_preflight {
+		method OPTIONS
+{% for origin in site.cors_origins %}
+		header Origin {{ origin }}
+{% endfor %}
+	}
+	handle @cors_preflight {
+		respond 204
+	}
+{% endif %}
+{% if site.noindex | default(con_caddy_noindex) %}
 	header X-Robots-Tag "noindex, nofollow"
 	handle /robots.txt {
 		respond "User-agent: *
