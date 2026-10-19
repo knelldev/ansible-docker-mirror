@@ -1,32 +1,32 @@
 ---
-- name: "({{ task_filename }}) Install win-feature Containers"
+- name: Install win-feature Containers
   ansible.windows.win_feature:
     name: Containers
     state: present
   register: win_feature
 
-- name: "({{ task_filename }}) Reboot if installing Containers feature requires it"
+- name: Reboot if installing Containers feature requires it
   ansible.windows.win_reboot:
   when: win_feature.reboot_required
 
-- name: "({{ task_filename }}) Ensure win_storage_base_path exists"
+- name: Ensure win_storage_base_path exists
   ansible.builtin.win_file:
     path: "{{ win_storage_base_path }}"
     state: directory
 
-- name: "({{ task_filename }}) Download Docker Installation Script"
+- name: Download Docker Installation Script
   ansible.windows.win_get_url:
     url: https://raw.githubusercontent.com/microsoft/Windows-Containers/Main/helpful_tools/Install-DockerCE/install-docker-ce.ps1
     dest: '{{ win_storage_base_path }}\ansible\install-docker-ce.ps1'
 
-- name: "({{ task_filename }}) Execute the Installation Script"
+- name: Execute the Installation Script
   ansible.windows.win_powershell:
     script: |
       {{ win_storage_base_path }}\ansible\install-docker-ce.ps1 -NoRestart -DockerVersion {{ win_docker_version }}
   register: win_docker_install_status
 
 # Or you can make win_reboot validate exactly what you need to work before running the next task
-- name: "({{ task_filename }}) Restart and validate docker is started"
+- name: Restart and validate docker is started
   ansible.windows.win_reboot:
     post_reboot_delay: 60
     test_command: 'exit (Get-Service -Name docker).Status -ne "Running"'

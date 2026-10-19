@@ -1,0 +1,4 @@
+---
+- hosts: all
+  roles:
+    - win_gitlab_runner

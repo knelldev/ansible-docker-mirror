@@ -16,4 +16,4 @@ con_semaphore_oidc_display_name: Sign in with Authentik
 con_semaphore_oidc_display_provider_url: https://auth.example.com/application/o/ansible/
 con_semaphore_oidc_display_client_id: id
 con_semaphore_oidc_display_client_secret: secret
-con_semaphore_oidc_display_redirect_url: "{{ con_semaphore_url }}/api/auth/oidc/authentik/redirect/"
+con_semaphore_oidc_display_redirect_url: "{{ con_semaphore_url }}/api/auth/oidc/authentik/redirect"

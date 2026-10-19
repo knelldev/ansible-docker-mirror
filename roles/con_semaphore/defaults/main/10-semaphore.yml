@@ -2,12 +2,16 @@
 # Default Values for Role - Might contain placeholders for passwords - NOT live
 ###############################################################################
 ---
+# Semaphore moves :latest to whatever it pushed last, an older branch too (2.18.31
+# after 2.19.16 on 2026-10-07); a DB migrated by a newer version then fails to
+# start. Pin a version tag here if needed.
+con_semaphore_image: docker.io/semaphoreui/semaphore:latest
 con_semaphore_expose: true
 con_semaphore_port: 3000
 con_semaphore_url: "http://localhost:{{ con_semaphore_port }}"
 
 con_semaphore_container_network_create: true
-con_semaphore_container_network_name: con_semaphore_default
+con_semaphore_container_network_name: semaphore_default
 
 con_semaphore_systemd_service_state: restarted
 
@@ -19,3 +23,17 @@ con_semaphore_admin_user: admin
 con_semaphore_admin_password: admin
 con_semaphore_admin_email: admin@example.com
 con_semaphore_admin_name: Admin
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_semaphore_user_create), mode (default 0700) and recurse.
+con_semaphore_dir_extra:
+  - name: config
+    owner: 1001
+    group: 1001
+    mode: "0755"
+  - name: semaphore_postgres
+    owner: 999
+    group: 999
+    mode: "0755"

@@ -1,0 +1,25 @@
+---
+- name: Ping local
+  hosts: localhost
+  connection: local
+  gather_subset:
+    - min
+  tasks:
+    - name: Ping host for tests
+      ansible.builtin.ping:
+        data: pong
+      changed_when: true
+      notify: Run callback smoke handler
+
+    - name: Print selected local facts
+      ansible.builtin.debug:
+        msg:
+          architecture: "{{ ansible_facts.architecture | default('unknown') }}"
+          distribution: "{{ ansible_facts.distribution | default('unknown') }}"
+          python_version: "{{ ansible_facts.python.version.full | default('unknown') }}"
+          system: "{{ ansible_facts.system | default('unknown') }}"
+
+  handlers:
+    - name: Run callback smoke handler
+      ansible.builtin.debug:
+        msg: Callback handler is active

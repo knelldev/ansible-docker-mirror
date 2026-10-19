@@ -12,6 +12,9 @@ win_package_list:
   - name: notepadplusplus
   - name: firefoxesr
 
-win_pip_list:
-  []
+win_pip_list: []
   # - requests
+
+# Local run fact (shared tasks/main.yml): off, facts.d is a Linux path;
+# Windows hosts are not covered.
+win_prepare_fact_enabled: false

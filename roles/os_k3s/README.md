@@ -1,38 +1,59 @@
-Role Name
-=========
+# K3s
 
-A brief description of the role goes here.
+Installs K3s servers and agents with the upstream install script, plus Helm.
 
-Requirements
-------------
+## Requirements
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- Ansible core 2.17 or newer, the `kubernetes.core` collection for the
+  optional namespace setup.
+- Linux hosts with the ports from the
+  [K3s networking requirements](https://docs.k3s.io/installation/requirements#networking)
+  open between them (6443 to the servers; 2379-2380 between servers with
+  embedded etcd).
 
-Role Variables
---------------
+## Topology
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+`os_k3s_server: true` (host or group var) marks a server; every other host in
+the play becomes an agent. Supported: one server, or an odd number of servers
+(3, 5, 7) with embedded etcd, each plus any number of agents.
 
-Dependencies
-------------
+- The first server of the play (inventory order) installs first. With more
+  than one server it gets `--cluster-init` (embedded etcd); a single server
+  installs as before.
+- The other servers and all agents join it with its URL
+  (`https://<fqdn>:6443`) and node token, read once from the first server.
+- An even server count only warns: two servers keep no etcd quorum when one
+  fails.
+- Servers and agents must be in the same run, so the joiners get the first
+  server's URL and token.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+## Role Variables
 
-Example Playbook
-----------------
+| Variable                              | Default  | Purpose                                      |
+| ------------------------------------- | -------- | -------------------------------------------- |
+| `os_k3s_server`                       | `false`  | This host is a K3s server (controller)       |
+| `os_k3s_channel`                      | `stable` | K3s channel or version                       |
+| `os_k3s_server_allow_schedule`        | `true`   | Allow workload pods on servers               |
+| `os_k3s_server_additional_parameters` | `""`     | Extra install arguments (servers and agents) |
+| `os_k3s_node_external_ip_override`    | `false`  | Pass `os_k3s_node_external_ip`               |
+| `os_k3s_helm_install`                 | `true`   | Install Helm                                 |
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+## Example Playbook
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+```yaml
+- hosts: all
+  roles:
+    - os_k3s
+```
 
-License
--------
+```bash
+ansible-playbook playbooks/os_k3s.yml -i <inventory> --limit <k3s cluster group>
+```
 
-BSD
+## License
 
-Author Information
-------------------
+MIT
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+## Author Information
+
+Maintained by the repository contributors.

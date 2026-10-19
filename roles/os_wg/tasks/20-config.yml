@@ -1,0 +1,11 @@
+# TODO(add-edge-vps-role):
+# - Keys: if /etc/wireguard/<if>.key is missing, generate it on the host
+#   (umask 077, `wg genkey`, guarded by `creates:`); derive <if>.pub with
+#   `wg pubkey`. The private key never goes to the controller or the repo.
+# - <if>.conf from a template: Address, ListenPort, MTU, Table = off,
+#   PostUp `wg set %i private-key /etc/wireguard/<if>.key`; one [Peer] with
+#   PublicKey and AllowedIPs (peer tunnel address + extras), no Endpoint
+#   (the peer has a dynamic prefix and sets PersistentKeepalive).
+# - Enable wg-quick@<if>; print the public IPv6, listen port, public key
+#   and tunnel addresses for the peer.
+---

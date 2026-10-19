@@ -8,7 +8,9 @@
                 "redirect_url": "{{ con_semaphore_oidc_display_redirect_url }}",
                 "scopes": ["openid", "profile", "email"],
                 "username_claim": "preferred_username",
-                "name_claim": "preferred_username"
+                "name_claim": "preferred_username",
+                "email_claim": "email",
+                "endpoint": {"algorithms": ["HS256", "ES256", "RS256"]}
             }
     }
 }

@@ -1,0 +1,31 @@
+{#
+  Template notes (CT-Q5), rendered in phase_template.yml with _build = the
+  build CT's hostvars. Text first (diff against the previous template, then
+  the stock diff), cut to what is left after the package list line; the list
+  is left out when it would leave less than notes_min_text_chars.
+#}
+{% set diff = _build.pve_ct_template_pkg_diff | default([]) %}
+{% set prev_diff = _build.pve_ct_template_prev_diff | default([]) %}
+{% set blob = _build.pve_ct_template_pkg_blob_b64 | default('') %}
+{% set blob_line = pve_ct_template_notes_pkglist_marker ~ blob %}
+{% set store = blob | length > 0
+   and (blob_line | length + 1 + pve_ct_template_notes_min_text_chars | int
+        <= pve_ct_template_notes_max_chars | int) %}
+{% set budget = pve_ct_template_notes_max_chars | int - ((blob_line | length + 1) if store else 0) %}
+{% set text %}
+AlmaLinux {{ _build.pve_ct_template_alma_version | default('?') }}
+Built {{ now(utc=true).strftime('%Y-%m-%d %H:%M') }} UTC from {{ pve_ct_template_image }}
+ansible-docker commit {{ pve_ct_template_git_commit }}
+{% if not store %}
+Package list not stored: the next build diffs only against the stock image.
+{% endif %}
+{% if _build.pve_ct_template_prev_found | default(false) | bool %}
+Packages new or changed against the previous template {{ pve_ct_template_prev_vmid }} ({{ prev_diff | length }}):
+{{ prev_diff | join('\n') }}
+{% else %}
+Previous template: no stored package list, no diff.
+{% endif %}
+Packages new or changed against the stock image ({{ diff | length }}):
+{{ diff | join('\n') }}
+{% endset %}
+{{ text | trim | truncate(budget, true, '\n[truncated; full lists in the task log]', 0) }}{{ ('\n' ~ blob_line) if store else '' }}

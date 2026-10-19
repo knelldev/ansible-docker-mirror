@@ -1,0 +1,75 @@
+[defaults]
+# --- CATEGORY: PROJECT STRUCTURE & PATHS ---
+# Customized: Standardizing local paths to keep the repository self-contained.
+inventory = ./inventory
+log_path = ./logs/ansible.log
+
+# FIX: Corrected old typo 'playbooks_dir' (plural) to the modern 'playbook_dir' (singular).
+playbook_dir = ./playbooks
+
+
+# --- CATEGORY: PERFORMANCE TUNING ---
+# Customized: High fork count allows parallel execution across up to 50 hosts simultaneously.
+forks = 50
+
+# Customized: Smart gathering checks fact cache instead of regathering facts unnecessarily.
+gathering = smart
+gather_subset = all
+
+
+# --- CATEGORY: SSH & SECURITY ---
+# Customized: Disabled host key checking to prevent interactive prompts on new instances.
+host_key_checking = False
+
+# Customized: Disabled legacy retry files to prevent cluttering your project directory.
+retry_files_enabled = False
+
+
+# --- CATEGORY: QUALITY & RELIABILITY ---
+# OPTIMIZATION: Suppresses noisy remote Python interpreter warnings while maintaining auto-discovery.
+interpreter_python = auto_silent
+
+# OPTIMIZATION: Forces triggered handlers to run even if a subsequent task fails.
+force_handlers = True
+
+
+# --- CATEGORY: CONSOLE OUTPUT & FORMATTING ---
+# FIX: Explicitly changed evaluation from old '0' to standard boolean 'False'.
+display_skipped_hosts = False
+
+# Customized: Retained the default callback but forced it to output readable YAML format.
+stdout_callback = default
+callback_result_format = yaml
+
+# Customized: Modern callback replacements for performance profiling.
+callbacks_enabled = timer, profile_tasks
+
+
+# --- CATEGORY: MISC / COSMETIC ---
+# CHANGE: Cowsay features have been completely disabled per your request.
+nocows = True
+
+
+[inventory]
+# OPTIMIZATION: Forces Ansible to fail immediately if an inventory source is unparseable.
+unparsed_is_failed = True
+
+
+[ssh_connection]
+# Customized: Drastically improves execution speed by reusing SSH connections for module payloads.
+pipelining = True
+
+# OPTIMIZATION: Automatically retries connections up to 3 times on transient network drops.
+retries = 3
+
+
+[colors]
+# Customized: Custom styling overrides for clearer terminal contrast.
+verbose = bright blue
+debug = bright gray
+error = light red
+
+
+[galaxy]
+# Customized: Preserved pathing layout for local galaxy role generation templates.
+role_skeleton = ./.skeletons/role-skeleton

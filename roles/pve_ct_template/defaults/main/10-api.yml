@@ -1,0 +1,27 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+# Secrets come from environment variables (Semaphore now; Bitwarden Secrets
+# Manager can set the same variables later). Override to use another source.
+###############################################################################
+---
+pve_ct_template_api_host: "{{ lookup('ansible.builtin.env', 'PROXMOX_HOST', default='') }}"
+pve_ct_template_api_port: 8006
+pve_ct_template_api_user: "{{ lookup('ansible.builtin.env', 'PROXMOX_USER', default='automation@pve') }}"
+pve_ct_template_api_token_id: "{{ lookup('ansible.builtin.env', 'PROXMOX_TOKEN_ID', default='lxc-template') }}"
+pve_ct_template_api_token_secret: "{{ lookup('ansible.builtin.env', 'PROXMOX_TOKEN_SECRET', default='') }}"
+pve_ct_template_validate_certs: true
+
+# Build key: public key goes to root of the build CT, private key file is
+# used by Ansible to log in as root (removed by os_template_reset)
+pve_ct_template_build_pubkey: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_BUILD_PUBKEY', default='') }}"
+pve_ct_template_build_key_file: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_BUILD_KEY_FILE', default='') }}"
+
+# Admin user: public keys (one per line) go to the template, private key
+# file is used for the clone test
+pve_ct_template_admin_user: localadmin
+pve_ct_template_admin_pubkeys: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_ADMIN_PUBKEYS', default='') | split('\n') | select | list }}"
+pve_ct_template_admin_key_file: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_ADMIN_KEY_FILE', default='') }}"
+
+# Local run fact (shared tasks/main.yml): off, the role works through the
+# Proxmox API from localhost.
+pve_ct_template_fact_enabled: false

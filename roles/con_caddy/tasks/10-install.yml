@@ -1,0 +1,36 @@
+---
+- name: Install container for {{ app_name }}
+  become: true
+  block:
+    - name: Copy error page for {{ app_name }}
+      ansible.builtin.copy:
+        src: error.html
+        dest: "{{ app_path }}/errors/error.html"
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
+        mode: "0644"
+
+    - name: Template Cloudflare token env file for {{ app_name }}
+      ansible.builtin.template:
+        src: caddy.env.j2
+        dest: "{{ app_path }}/caddy.env"
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
+        mode: "0600"
+      no_log: true
+      notify: Restart caddy
+
+    - name: Template quadlet for {{ app_name }}
+      ansible.builtin.template:
+        src: quadlet-caddy.container.j2
+        dest: /etc/containers/systemd/caddy.container
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart caddy
+
+    - name: Link quadlet into storage for {{ app_name }}
+      ansible.builtin.file:
+        src: /etc/containers/systemd/caddy.container
+        dest: "{{ app_path }}/quadlet-caddy.container"
+        state: link

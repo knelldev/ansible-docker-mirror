@@ -1,0 +1,28 @@
+---
+- name: First-boot identity unit
+  become: true
+  when: os_prepare_firstboot_enabled | bool
+  block:
+    - name: Install first-boot script
+      ansible.builtin.copy:
+        src: firstboot-identity.sh
+        dest: /usr/local/sbin/firstboot-identity
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install first-boot unit
+      ansible.builtin.copy:
+        src: firstboot-identity.service
+        dest: /etc/systemd/system/firstboot-identity.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    # Enable only; the unit runs on the next boot of a clone (marker removed
+    # by os_template_reset).
+    - name: Enable first-boot unit
+      ansible.builtin.systemd_service:
+        name: firstboot-identity.service
+        enabled: true
+        daemon_reload: true

@@ -1,0 +1,6 @@
+---
+# Helper (guest): refresh the package facts behind
+# pve_ct_template_packages (vars/main.yml, name-version-release lines)
+- name: Read installed packages
+  ansible.builtin.package_facts:
+    manager: rpm

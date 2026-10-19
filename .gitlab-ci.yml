@@ -1,6 +1,6 @@
 ---
 include:
-  - project: knell-internal/templates
+  - project: knelldev/ai-develop/templates
     file: Default-CI-Docker.gitlab-ci.yml
 
 variables:

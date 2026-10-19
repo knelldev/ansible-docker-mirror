@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+name: {{ agent_item.name | to_json }}
+id: {{ k3s_gitlab_agent_item_id | to_json }}
+project: {{ agent_item.project | string | to_json }}
+agent: {{ 'reused' if k3s_gitlab_agent_created is skipped else 'created' }}
+namespace: {{ k3s_gitlab_agent_item_namespace | to_json }}
+service_account: {{ k3s_gitlab_agent_item_service_account | to_json }}
+values_file: {{ k3s_gitlab_agent_item_values_path | to_json }}
+token: {{ 'reused' if k3s_gitlab_agent_new_token is skipped else ('rotated' if k3s_gitlab_agent_rotate_token | bool else 'created') }}
+token_id_in_secret: {{ k3s_gitlab_agent_item_token_id | to_json }}
+revoked_tokens: {{ (k3s_gitlab_agent_item_pre_revoke_ids + k3s_gitlab_agent_item_post_revoke_ids) | to_json }}
+helm_changed: {{ k3s_gitlab_agent_helm.changed | to_json }}
+targets: {{ agent_item.targets | map(attribute='namespace') | list | to_json }}

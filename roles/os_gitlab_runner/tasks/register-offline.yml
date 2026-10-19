@@ -1,5 +1,5 @@
 ---
-- name: register offline gitlab runner
+- name: Register offline gitlab runner
   shell: |
     gitlab-runner register \
     --non-interactive \
@@ -17,4 +17,3 @@
   retries: 10
   delay: 5
   until: offline_result.rc == 0
-

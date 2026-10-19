@@ -12,4 +12,16 @@ os_prepare_packages:
   - ncdu
   - rpmconf
 
-os_prepare_dnf_automatic_enabled: ture
+os_prepare_dnf_automatic_enabled: true
+
+# Logrotate configuration
+os_prepare_logrotate_compress: true
+
+# Journald configuration
+os_prepare_journald_configure: true
+os_prepare_journald_compress: true # true/false. Default is true.
+os_prepare_journald_system_max_use: "" # Maximum log size e.g. 1G
+os_prepare_journald_system_keep_free: "1G" # Space to keep free while writing logs
+os_prepare_journald_system_max_file_size: "" # E.g. 100M. The maximum size of a single journal file.
+os_prepare_journald_max_retention_sec: "" # The maximum time to store journal entries. (E.g. 1month)
+os_prepare_journald_max_file_sec: "" # The maximum time a single journal file can span. (e.g. 1week)

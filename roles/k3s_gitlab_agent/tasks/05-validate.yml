@@ -1,0 +1,83 @@
+---
+# Input checks only. They run before any API call or cluster change.
+# Cluster-only role: everything runs once against the kubeconfig of a K3s
+# server, so fail early on any other host.
+- name: Check kubeconfig on the K3s server
+  ansible.builtin.stat:
+    path: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+  become: true
+  run_once: true
+  register: k3s_gitlab_agent_kubeconfig
+
+- name: Require a K3s server with kubeconfig
+  ansible.builtin.assert:
+    that: k3s_gitlab_agent_kubeconfig.stat.exists
+    fail_msg: >-
+      {{ k3s_gitlab_agent_kubeconfig_path }} not found on {{ inventory_hostname }}.
+      Run this role against a K3s server/controller, e.g. --limit <controller group>.
+    quiet: true
+  run_once: true
+
+- name: Validate agent list and KAS address for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - k3s_gitlab_agent_config_list is sequence
+      - k3s_gitlab_agent_config_list is not string
+      - k3s_gitlab_agent_config_list is not mapping
+      - >-
+        (k3s_gitlab_agent_config_list | map(attribute='name', default='') | list | length)
+        == (k3s_gitlab_agent_config_list | map(attribute='name', default='') | unique | list | length)
+      - (k3s_gitlab_agent_kas_address | trim | urlsplit('scheme')) in k3s_gitlab_agent_kas_schemes
+    fail_msg: >-
+      k3s_gitlab_agent_config_list must be a list with unique agent names, and
+      the KAS address {{ k3s_gitlab_agent_kas_address | trim }} must use one of
+      {{ k3s_gitlab_agent_kas_schemes | join(', ') }}.
+    quiet: true
+
+- name: Validate agent entry {{ item.name | default('(unnamed)') }}
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name is match(k3s_gitlab_agent_name_pattern)
+      - item.name | length <= k3s_gitlab_agent_name_max_length
+      - item.project is defined
+      - (item.project | string | length) > 0
+      - item.namespace is not defined or item.namespace is match(k3s_gitlab_agent_name_pattern)
+      - item.targets is defined
+      - item.targets is sequence
+      - item.targets is not string
+      - item.targets | length > 0
+      - >-
+        (item.targets | map(attribute='namespace', default='') | list | length)
+        == (item.targets | map(attribute='namespace', default='') | unique | list | length)
+    fail_msg: >-
+      Agent {{ item.name | default('(unnamed)') }} needs a name (lowercase
+      letters, digits, dashes, at most {{ k3s_gitlab_agent_name_max_length }}
+      characters), a project, a valid optional namespace and a non-empty list
+      of targets with unique namespaces.
+    quiet: true
+  loop: "{{ k3s_gitlab_agent_config_list }}"
+  loop_control:
+    label: "{{ item.name | default('(unnamed)') }}"
+
+- name: Validate agent targets for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - item.1.namespace is defined
+      - item.1.namespace is match(k3s_gitlab_agent_name_pattern)
+      - (item.1.rules is defined) != (item.1.cluster_role is defined)
+      - >-
+        item.1.rules is not defined
+        or (item.1.rules is sequence and item.1.rules is not string and item.1.rules | length > 0)
+      - >-
+        item.1.cluster_role is not defined
+        or (item.1.cluster_role is string and item.1.cluster_role | length > 0)
+    fail_msg: >-
+      Agent {{ item.0.name }}: target {{ item.1.namespace | default('(no namespace)') }}
+      needs a namespace and exactly one of rules (a non-empty list) or
+      cluster_role (a ClusterRole name).
+    quiet: true
+  loop: "{{ k3s_gitlab_agent_config_list | subelements('targets') }}"
+  loop_control:
+    label: "{{ item.0.name }}/{{ item.1.namespace | default('(no namespace)') }}"

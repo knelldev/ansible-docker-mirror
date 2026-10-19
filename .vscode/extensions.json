@@ -1,11 +1,9 @@
 {
-    "recommendations": [
-        "esbenp.prettier-vscode",
-        "ms-python.black-formatter",
-        "editorconfig.editorconfig",
-        "gitlab.gitlab-workflow",
-        "ms-python.isort",
-        "oderwat.indent-rainbow",
-        "redhat.vscode-yaml"
-    ]
+  "recommendations": [
+    "redhat.vscode-yaml",
+    "redhat.ansible",
+    "ms-pyright.pyright",
+    "hashicorp.terraform",
+    "mads-hartmann.bash-ide-vscode"
+  ]
 }

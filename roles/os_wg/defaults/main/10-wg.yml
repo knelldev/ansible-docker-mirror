@@ -1,0 +1,24 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+# DRAFT variable contract (OpenSpec change add-edge-vps-role). Tasks are not
+# implemented yet; names may still change.
+#
+# Bare WireGuard: one interface with one peer. The private key is generated
+# on the host and never leaves it; the role prints the public key.
+---
+os_wg_interface: wg0
+os_wg_listen_port: 51820
+os_wg_address: __REQUIRED__ # own tunnel address, e.g. 10.200.121.2/30
+os_wg_peer_address: __REQUIRED__ # peer tunnel address, e.g. 10.200.121.1
+os_wg_peer_public_key: __REQUIRED__ # peer public key (not secret)
+# Extra AllowedIPs for the peer besides its tunnel address.
+os_wg_peer_allowed_ips_extra: []
+# WireGuard over IPv6 with the peer behind PPPoE: 1492 - 80 = 1412.
+os_wg_mtu: 1412
+
+# Optional edge part for an entry VPS: forwarding between the public side
+# and the tunnel. Off by default; bare WireGuard does not forward.
+os_wg_edge_enabled: false
+os_wg_edge_ipv4_forward: true
+os_wg_edge_ipv6_forward: true

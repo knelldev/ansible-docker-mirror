@@ -1,0 +1,188 @@
+---
+# Per-agent flow, included from 10-install.yml with loop_var agent_item.
+# Names, URLs and token lists (k3s_gitlab_agent_item_*) are lazy expressions
+# in vars/main.yml over agent_item and the results registered here;
+# manifests are templates. Every task that sends the API token or handles the agent
+# token uses no_log.
+
+# --- Registration ---
+- name: Read GitLab agents of project for {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_agents_url }}?per_page=100"
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_agent_existing
+  no_log: true
+
+- name: Register GitLab agent {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_agents_url }}"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    body_format: json
+    body:
+      name: "{{ agent_item.name }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: [200, 201]
+  register: k3s_gitlab_agent_created
+  when: k3s_gitlab_agent_item_existing_id | length == 0
+  changed_when: true
+  no_log: true
+
+# --- Namespace and token ---
+- name: Create agent namespace for {{ agent_item.name }}
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ k3s_gitlab_agent_item_namespace }}"
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+
+- name: Read token Secret for {{ agent_item.name }}
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: "{{ k3s_gitlab_agent_item_namespace }}"
+    name: "{{ k3s_gitlab_agent_item_secret_name }}"
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_agent_secret
+  no_log: true
+
+- name: Read active tokens of agent {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}?per_page=100"
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_agent_tokens
+  no_log: true
+
+# A new token is needed when the Secret holds none or on rotation. At
+# GitLab's limit of two active tokens, the unused ones are revoked first.
+- name: Revoke unused tokens of agent {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}/{{ item }}"
+    method: DELETE
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: [200, 204]
+  loop: "{{ k3s_gitlab_agent_item_pre_revoke_ids }}"
+  changed_when: true
+  no_log: true
+
+- name: Create agent token for {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    body_format: json
+    body: "{{ k3s_gitlab_agent_item_token_body }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: [200, 201]
+  register: k3s_gitlab_agent_new_token
+  when: k3s_gitlab_agent_item_needs_token | bool
+  changed_when: true
+  no_log: true
+
+- name: Write token Secret for {{ agent_item.name }}
+  kubernetes.core.k8s:
+    definition: "{{ lookup('ansible.builtin.template', 'secret.yaml.j2') | from_yaml }}"
+    apply: true
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  when: k3s_gitlab_agent_new_token is not skipped
+  no_log: true
+
+# --- Namespace-scoped RBAC per target ---
+- name: Create target namespaces for {{ agent_item.name }}
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ item.namespace }}"
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  loop: "{{ agent_item.targets }}"
+  loop_control:
+    label: "{{ item.namespace }}"
+
+- name: Apply target Roles for {{ agent_item.name }}
+  kubernetes.core.k8s:
+    definition: "{{ lookup('ansible.builtin.template', 'role.yaml.j2') | from_yaml }}"
+    apply: true
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  loop: "{{ agent_item.targets | selectattr('rules', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.namespace }}"
+
+- name: Apply target RoleBindings for {{ agent_item.name }}
+  kubernetes.core.k8s:
+    definition: "{{ lookup('ansible.builtin.template', 'rolebinding.yaml.j2') | from_yaml }}"
+    apply: true
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+  loop: "{{ agent_item.targets }}"
+  loop_control:
+    label: "{{ item.namespace }}"
+
+# --- Helm release ---
+# The values file stays on the host that runs Helm (run_once, like the rest
+# of 10-install.yml) for a manual `helm upgrade -f`. It holds no token; the
+# token id in podAnnotations rolls the pods on rotation.
+- name: Create values directory for {{ agent_item.name }}
+  ansible.builtin.file:
+    path: "{{ k3s_gitlab_agent_item_values_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write values for {{ agent_item.name }}
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: "{{ k3s_gitlab_agent_item_values_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+# Updates the chart repo cache once, with the first agent.
+- name: Deploy Helm chart for {{ agent_item.name }}
+  kubernetes.core.helm:
+    release_name: "{{ agent_item.name }}"
+    chart_ref: gitlab/gitlab-agent
+    chart_version: "{{ k3s_gitlab_agent_chart_version | default(omit, true) }}"
+    release_namespace: "{{ k3s_gitlab_agent_item_namespace }}"
+    update_repo_cache: "{{ agent_index == 0 }}"
+    values_files:
+      - "{{ k3s_gitlab_agent_item_values_path }}"
+    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+    binary_path: "{{ k3s_gitlab_agent_helm_binary_path }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    wait: "{{ k3s_gitlab_agent_helm_wait }}"
+    timeout: "{{ k3s_gitlab_agent_helm_timeout }}"
+  register: k3s_gitlab_agent_helm
+
+- name: Check agentk health for {{ agent_item.name }}
+  ansible.builtin.include_tasks: health.yml
+
+# After a successful rotation, revoke every token except the Secret's.
+- name: Revoke old tokens of agent {{ agent_item.name }}
+  ansible.builtin.uri:
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}/{{ item }}"
+    method: DELETE
+    headers:
+      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+    validate_certs: "{{ http.ssl_verify }}"
+    status_code: [200, 204]
+  loop: "{{ k3s_gitlab_agent_item_post_revoke_ids }}"
+  changed_when: true
+  no_log: true
+
+- name: Show summary for agent {{ agent_item.name }}
+  ansible.builtin.debug:
+    msg: "{{ lookup('ansible.builtin.template', 'summary-agent.yaml.j2') | from_yaml }}"

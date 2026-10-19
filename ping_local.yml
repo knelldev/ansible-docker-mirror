@@ -1,7 +1,0 @@
----
-- name: "Playbook: ping_local"
-  hosts: localhost
-  connection: local
-  tasks:
-    - name: Ping host for tests
-      action: ansible.builtin.ping

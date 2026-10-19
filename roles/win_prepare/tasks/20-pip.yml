@@ -1,13 +1,13 @@
 ---
-- name: "({{ task_filename }}) Download get-pip.py"
+- name: Download get-pip.py
   ansible.windows.win_get_url:
     url: https://bootstrap.pypa.io/get-pip.py
     dest: "{{ win_storage_base_path }}\\ansible"
     force: false
 
-- name: "({{ task_filename }}) install pip"
+- name: Install pip
   ansible.windows.win_shell: "python {{ win_storage_base_path }}\\ansible\\get-pip.py"
 
-- name: "({{ task_filename }}) install pip"
+- name: Install pip
   ansible.windows.win_shell: "pip install {{ item }}"
   loop: "{{ win_pip_list }}"

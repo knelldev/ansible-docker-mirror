@@ -1,6 +1,0 @@
----
-- name: "Playbook: ping"
-  hosts: "{{ hosts_limit | default('all') }}"
-  tasks:
-    - name: Ping host for tests
-      action: ansible.builtin.ping

@@ -1,0 +1,7 @@
+---
+- name: "Playbook: con_gninx"
+  hosts: all
+  roles:
+    # - os_prepare
+    # - os_hardening
+    - con_nginx

@@ -1,0 +1,32 @@
+---
+# Cluster-only role: everything runs once against the kubeconfig of a K3s
+# server, so fail early on any other host.
+- name: Check kubeconfig on the K3s server
+  ansible.builtin.stat:
+    path: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+  become: true
+  run_once: true
+  register: k3s_gitlab_runner_kubeconfig
+
+- name: Require a K3s server with kubeconfig
+  ansible.builtin.assert:
+    that: k3s_gitlab_runner_kubeconfig.stat.exists
+    fail_msg: >-
+      {{ k3s_gitlab_runner_kubeconfig_path }} not found on {{ inventory_hostname }}.
+      Run this role against a K3s server/controller, e.g. --limit <controller group>.
+    quiet: true
+  run_once: true
+
+- name: Block for become=true
+  become: true
+  when: k3s_gitlab_runner_namespace_create
+  run_once: true
+  block:
+    - name: Create K3s namespace
+      kubernetes.core.k8s:
+        name: "{{ k3s_gitlab_runner_namespace | lower }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"

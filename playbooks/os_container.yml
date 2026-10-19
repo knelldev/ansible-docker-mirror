@@ -1,0 +1,5 @@
+---
+- name: "Playbook: os_container"
+  hosts: all
+  roles:
+    - os_container

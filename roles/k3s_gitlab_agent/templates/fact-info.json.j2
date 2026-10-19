@@ -1,0 +1,12 @@
+{# Per agent: chart and agentk image. The image tag is "unknown" when the
+   server version was not read in this run. #}
+{% set agents = [] %}
+{% for agent in k3s_gitlab_agent_config_list | default([]) if agent.name | default('') | length > 0 %}
+{%   set _ = agents.append({
+       'name': agent.name,
+       'chart': 'gitlab/gitlab-agent',
+       'chart_version': k3s_gitlab_agent_chart_version | default('', true) or 'latest',
+       'image_tag': k3s_gitlab_agent_image_tag_effective | default('unknown')
+     }) %}
+{% endfor %}
+{{ {'agents': agents} | to_json }}

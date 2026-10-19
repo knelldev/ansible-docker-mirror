@@ -1,7 +1,23 @@
 ---
-app_name: "{{ role_name.split('_')[1] }}" # noqa var-naming[no-role-prefix]
-app_path: "{{ storage_base_path }}/{{ app_name }}" # noqa var-naming[no-role-prefix]
+app_name: "{{ lookup('ansible.builtin.vars', role_name + '_name', default=role_name.split('_')[1:] | join('_')) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ lookup('ansible.builtin.vars', role_name + '_path', default=storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ lookup('ansible.builtin.vars', role_name + '_user', default=app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ lookup('ansible.builtin.vars', role_name + '_group', default=app_user) }}" # noqa var-naming[no-role-prefix]
+app_user_create: "{{ lookup('ansible.builtin.vars', role_name + '_user_create', default=false) }}" # noqa var-naming[no-role-prefix]
+app_dir_extra: "{{ lookup('ansible.builtin.vars', role_name + '_dir_extra', default=[]) }}" # noqa var-naming[no-role-prefix]
 
 os_k3s_pip_packages:
   - kubernetes
   - openshift
+
+# Servers of this play (os_k3s_server: true), in inventory order. The first
+# one initialises the cluster; the others join it (tasks/k3s-server.yml).
+os_k3s_server_hosts: >-
+  {{
+    ansible_play_hosts_all
+    | map('extract', hostvars)
+    | selectattr('os_k3s_server', 'defined')
+    | selectattr('os_k3s_server', 'truthy', true)
+    | map(attribute='inventory_hostname')
+    | list
+  }}

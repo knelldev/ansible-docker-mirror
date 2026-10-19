@@ -1,2 +1,40 @@
 ---
-# vars file for os_prepare
+app_name: "{{ lookup('ansible.builtin.vars', role_name + '_name', default=role_name.split('_')[1:] | join('_')) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ lookup('ansible.builtin.vars', role_name + '_path', default=storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ lookup('ansible.builtin.vars', role_name + '_user', default=app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ lookup('ansible.builtin.vars', role_name + '_group', default=app_user) }}" # noqa var-naming[no-role-prefix]
+app_user_create: "{{ lookup('ansible.builtin.vars', role_name + '_user_create', default=false) }}" # noqa var-naming[no-role-prefix]
+app_dir_extra: "{{ lookup('ansible.builtin.vars', role_name + '_dir_extra', default=[]) }}" # noqa var-naming[no-role-prefix]
+
+# /etc/login.defs settings for os_container_rootless (30-rootless.yml)
+os_container_login_defs:
+  SUB_UID_MIN: "{{ os_container_subid_min }}"
+  SUB_UID_MAX: "{{ os_container_subid_max }}"
+  SUB_UID_COUNT: "{{ os_container_subid_count }}"
+  SUB_GID_MIN: "{{ os_container_subid_min }}"
+  SUB_GID_MAX: "{{ os_container_subid_max }}"
+  SUB_GID_COUNT: "{{ os_container_subid_count }}"
+
+# systemd units and drop-ins rendered by templates/systemd-unit.j2: path and
+# sections, each section a list of lines (keys may repeat).
+os_container_systemd_units:
+  auto_update_timer:
+    path: /etc/systemd/system/podman-auto-update.timer.d/override.conf
+    sections:
+      Timer:
+        - OnCalendar=
+        - OnCalendar={{ os_container_auto_update_schedule }}
+        - RandomizedDelaySec=900
+        - Persistent=true
+  unprivileged_port_start:
+    path: /etc/systemd/system/unprivileged-port-start.service
+    sections:
+      Unit:
+        - Description=Lowest port unprivileged processes may bind
+        - After=network-pre.target
+      Service:
+        - Type=oneshot
+        - RemainAfterExit=yes
+        - ExecStart=/usr/sbin/sysctl -w net.ipv4.ip_unprivileged_port_start={{ os_container_unprivileged_port_start }}
+      Install:
+        - WantedBy=multi-user.target

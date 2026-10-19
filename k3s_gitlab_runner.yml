@@ -1,6 +1,0 @@
----
-- name: "Playbook: k3s_gitlab_runner"
-  hosts: "{{ hosts_limit | default('all') }}"
-  roles:
-    # - os_k3s
-    - k3s_gitlab_runner

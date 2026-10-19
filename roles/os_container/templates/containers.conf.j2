@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+[containers]
+{% if os_container_netns_host | bool %}
+netns = "host"
+{% endif %}

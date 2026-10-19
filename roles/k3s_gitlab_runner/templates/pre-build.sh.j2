@@ -1,0 +1,126 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# GitLab Runner Pre-Build Hook
+# Deployed by Ansible - do not edit manually
+# POSIX-compatible (works on alpine, debian, redhat, etc.)
+
+MONITOR_DIR="/tmp/runner_monitor_$$"
+mkdir -p "$MONITOR_DIR"
+
+# Save start time
+date +%s > "$MONITOR_DIR/start_time"
+
+# --- Detect runner size from CI variables ---
+RUNNER_SIZE="custom"
+# CI_RUNNER_TAGS may be a JSON array (["k8s-s", "docker-s"]) or a comma list:
+# split on anything that isn't part of a tag name.
+for tag in $(echo "$CI_RUNNER_TAGS" | tr -c 'a-z0-9-' ' '); do
+  case "$tag" in
+    k8s-xs | k8s-s | k8s-m | k8s-l | k8s-xl | k8s-xxl)
+      RUNNER_SIZE="${tag#k8s-}"
+      break
+      ;;
+  esac
+done
+echo "$RUNNER_SIZE" > "$MONITOR_DIR/runner_size"
+
+# --- Read actual memory limit from cgroup ---
+MEMORY_LIMIT_BYTES=0
+
+# Check for cgroup v2 (modern) - Alpine, Ubuntu 22.04+, Debian 11+, Fedora, Alma/Rocky 9+
+if [ -f /sys/fs/cgroup/memory.max ]; then
+  val=$(cat /sys/fs/cgroup/memory.max 2>/dev/null)
+  if [ "$val" != "max" ] && [ -n "$val" ]; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Check for cgroup v1 (older systems) - RHEL/CentOS 7/8, some Debian/Ubuntu
+elif [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  val=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+# Alpine fallback: check memory.current as limit (some Alpine configs)
+elif [ -f /sys/fs/cgroup/memory.current ]; then
+  val=$(cat /sys/fs/cgroup/memory.current 2>/dev/null)
+  if [ "$val" -gt 0 ] 2>/dev/null; then
+    MEMORY_LIMIT_BYTES=$val
+  fi
+fi
+
+if [ "$MEMORY_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
+  MEMORY_LIMIT_MB=$((MEMORY_LIMIT_BYTES / 1024 / 1024))
+  if [ "$MEMORY_LIMIT_MB" -ge 1024 ]; then
+    MEMORY_LIMIT_HUMAN="$((MEMORY_LIMIT_MB / 1024)) GB"
+  else
+    MEMORY_LIMIT_HUMAN="${MEMORY_LIMIT_MB} MB"
+  fi
+else
+  MEMORY_LIMIT_HUMAN="unlimited"
+fi
+
+# --- Read CPU quota ---
+CPU_INFO="unknown"
+
+# Check for cgroup v2 (modern)
+if [ -f /sys/fs/cgroup/cpu.max ]; then
+  max_line=$(cat /sys/fs/cgroup/cpu.max 2>/dev/null)
+  if [ -n "$max_line" ]; then
+    quota=$(echo "$max_line" | awk '{print $1}')
+    period=$(echo "$max_line" | awk '{print $2}')
+    if [ "$quota" != "max" ] && [ "$quota" -gt 0 ] 2>/dev/null; then
+      CPU_INFO="$((quota / period)) cores (limited)"
+    else
+      CPU_INFO="no limit (request-only)"
+    fi
+  fi
+# Check for cgroup v1 (older systems)
+elif [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -f /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
+  quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null)
+  period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null)
+  if [ "$quota" -gt 0 ] 2>/dev/null; then
+    CPU_INFO="$((quota / period)) cores (limited)"
+  else
+    CPU_INFO="no limit (request-only)"
+  fi
+fi
+
+# --- Print runner info ---
+echo "=========================================================="
+echo "Runner size:  ${RUNNER_SIZE}"
+echo "Memory limit: ${MEMORY_LIMIT_HUMAN}"
+echo "CPU:          ${CPU_INFO}"
+if [ -n "$CI_RUNNER_DESCRIPTION" ]; then
+  echo "Description:  ${CI_RUNNER_DESCRIPTION}"
+fi
+echo "=========================================================="
+
+# --- Start memory + CPU monitor in background ---
+nohup sh -c "
+while true; do
+  # Memory - try cgroup v2 first, then v1
+  if [ -f /sys/fs/cgroup/memory.current ]; then
+    cat /sys/fs/cgroup/memory.current
+  elif [ -f /sys/fs/cgroup/memory.usage_in_bytes ]; then
+    cat /sys/fs/cgroup/memory.usage_in_bytes
+  else
+    echo 0
+  fi >> $MONITOR_DIR/memory.log
+
+  # CPU usage (nanoseconds) - try cgroup v2 first, then v1
+  if [ -f /sys/fs/cgroup/cpu.stat ]; then
+    awk '/^usage_usec/ {print \$2 * 1000}' /sys/fs/cgroup/cpu.stat
+  elif [ -f /sys/fs/cgroup/cpu/cpuacct.usage ]; then
+    cat /sys/fs/cgroup/cpu/cpuacct.usage
+  else
+    echo 0
+  fi >> $MONITOR_DIR/cpu.log
+
+  sleep {{ k3s_gitlab_runner_hook_sample_interval_seconds | int }}
+done
+" > /dev/null 2>&1 &
+
+echo $! > "$MONITOR_DIR/monitor_pid"
+
+# Store monitor dir path for post-build
+echo "$MONITOR_DIR" > /tmp/runner_monitor_dir
+echo "Resource monitor started"

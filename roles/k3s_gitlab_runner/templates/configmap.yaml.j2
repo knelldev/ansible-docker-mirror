@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# Hook scripts for every runner release. Job pods mount this ConfigMap at
+# /opt/gitlab-runner/scripts (values.yaml.j2); files have no exec bit, so the
+# hooks run them with sh.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runner-scripts
+  namespace: {{ k3s_gitlab_runner_namespace | lower | to_json }}
+data:
+  pre-build.sh: {{ lookup('ansible.builtin.template', 'pre-build.sh.j2') | to_json }}
+  post-build.sh: {{ lookup('ansible.builtin.template', 'post-build.sh.j2') | to_json }}

@@ -1,0 +1,35 @@
+namespace: knelldev
+name: rituals
+version: 1.0.0
+readme: README.md
+authors:
+  - knelldev
+description: Repeatable automation rituals for Linux, containers, Kubernetes, and infrastructure.
+license:
+  - MIT
+tags:
+  - automation
+  - containers
+  - kubernetes
+  - linux
+  - infrastructure
+dependencies: {}
+repository: https://gitlab.knell.dev/knell-internal/platform/ansible/ansible-docker
+issues: https://gitlab.knell.dev/knell-internal/platform/ansible/ansible-docker/-/issues
+build_ignore:
+  - .ansible
+  - .ai
+  - .github
+  - .opencode
+  - .skel-out
+  - collections
+  - openspec
+  - roles/.skeletons
+  - scripts
+  - callback_plugins
+  - .ruff_cache
+  - .mypy_cache
+  - .coverage
+  - .yamllint
+  - Dockerfile
+  - requirements.txt

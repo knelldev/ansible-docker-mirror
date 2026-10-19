@@ -1,49 +1,35 @@
 ---
-- name: "({{ task_filename }}) block for become=true"
+# Shared by every role that stores files on the host; keep it identical.
+# Role-specific directories go into <role>_dir_extra (defaults), other
+# prerequisites and checks into a later numbered task file.
+- name: Prepare account and storage for {{ app_name }}
   become: true
   block:
-    - name: "({{ task_filename }}) Print some information"
-      ansible.builtin.debug:
-        msg:
-          - "app_name: {{ app_name }}"
-          - "app_path: {{ app_path }}"
-
-    - name: "({{ task_filename }}) Create {{ app_name }} dirs"
-      ansible.builtin.file:
-        path: "{{ app_path }}/{{ item.name }}"
-        state: directory
-        owner: "{{ item.owner | default('root') }}"
-        group: "{{ item.group | default('data') }}"
-        mode: "{{ item.mode | default('0755') }}"
-      loop:
-        - name: ""
-          mode: "0770"
-        - name: config
-          owner: root
-          group: root
-        - name: logs
-          owner: root
-          group: root
-        - name: data
-          owner: root
-          group: root
-        - name: ca-custom
-          mode: "0770"
-
-    - name: "({{ task_filename }}) We already got ssl certs block (remove in hopefully a year)"
-      when: con_gitlab_ssl_certs_write
+    - name: Create user and group for {{ app_name }}
+      when: app_user_create | bool
       block:
-        - name: "({{ task_filename }}) Create gitlab ssl dir"
-          ansible.builtin.file:
-            path: "{{ app_path }}/{{ item }}"
-            state: directory
-            mode: "0770"
-          loop:
-            - config/ssl
+        - name: Create group for {{ app_name }}
+          ansible.builtin.group:
+            name: "{{ app_group }}"
+            system: true
+            state: present
 
-        - name: "({{ task_filename }}) Copy certs into ssl dir"
-          ansible.builtin.copy:
-            content: "{{ item.content }}"
-            dest: "{{ item.path }}"
-            mode: "0660"
-          loop: "{{ con_gitlab_ssl_certs_dict }}"
+        - name: Create user for {{ app_name }}
+          ansible.builtin.user:
+            name: "{{ app_user }}"
+            group: "{{ app_group }}"
+            system: true
+            create_home: false
+            state: present
+
+    - name: Create storage directories for {{ app_name }}
+      ansible.builtin.file:
+        path: "{{ (app_path + '/' + item.name) | regex_replace('/$', '') }}"
+        state: directory
+        owner: "{{ item.owner | default(app_user if app_user_create | bool else 'root') }}"
+        group: "{{ item.group | default(app_group if app_user_create | bool else storage_group) }}"
+        mode: "{{ item.mode | default('0700') }}"
+        recurse: "{{ item.recurse | default(false) }}"
+      loop: "{{ [{'name': ''}] + app_dir_extra }}"
+      loop_control:
+        label: "{{ item.name }}"

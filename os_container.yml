@@ -1,5 +1,0 @@
----
-- name: "Playbook: os_container"
-  hosts: "{{ hosts_limit | default('all') }}"
-  roles:
-    - os_container

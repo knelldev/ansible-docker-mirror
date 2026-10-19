@@ -1,0 +1,24 @@
+---
+# Helper: wait for the IPv4 of eth0 of pve_ct_template_ip_vmid and for SSH
+# -> pve_ct_template_guest_ip (vars/main.yml)
+- name: Wait for guest IPv4 from the Proxmox API
+  ansible.builtin.uri:
+    url: "{{ pve_ct_template_api_url }}/nodes/{{ pve_ct_template_node }}/lxc/{{ pve_ct_template_ip_vmid }}/interfaces"
+    headers: "{{ pve_ct_template_api_headers }}"
+    validate_certs: "{{ pve_ct_template_validate_certs }}"
+    method: GET
+  register: pve_ct_template_ifaces
+  until: >-
+    (pve_ct_template_ifaces.json.data | default([], true)
+     | selectattr('name', 'equalto', 'eth0') | map(attribute='inet')
+     | select | list | length) > 0
+  retries: "{{ pve_ct_template_ip_retries }}"
+  delay: "{{ pve_ct_template_ip_delay }}"
+  no_log: true # request headers carry the token secret
+
+- name: Wait for SSH on the guest
+  ansible.builtin.wait_for:
+    host: "{{ pve_ct_template_guest_ip }}"
+    port: 22
+    search_regex: OpenSSH
+    timeout: "{{ pve_ct_template_ssh_timeout }}"

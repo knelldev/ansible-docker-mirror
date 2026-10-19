@@ -1,0 +1,3 @@
+# Install or deploy the role's primary component. Keep the core desired-state
+# work here and split larger implementations into additional numbered files.
+---

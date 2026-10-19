@@ -33,3 +33,21 @@ con_nginx_configs:
     # Extra configs at the end of the file. Can be anything outside of the default location. (e.g. a new location)
     extra_config_global: |
       # Extra configs
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_nginx_user_create), mode (default 0700) and recurse.
+con_nginx_dir_extra:
+  - name: ssl
+    owner: 101
+    group: 101
+    mode: "0755"
+  - name: html
+    owner: 101
+    group: 101
+    mode: "0755"
+  - name: conf.d
+    owner: 101
+    group: 101
+    mode: "0755"

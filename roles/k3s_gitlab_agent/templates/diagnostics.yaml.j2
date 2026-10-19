@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Failure diagnostics of agentk {{ agent_item.name }}: [name, phase, container
+# statuses] per pod, [object, reason, message] per event, [pod, lines] per log.
+pods:
+{% for pod in k3s_gitlab_agent_failed_pods.resources | default([]) %}
+  - {{ [pod.metadata.name, pod.status.phase | default('unknown'), pod.status.containerStatuses | default([])] | to_json }}
+{% endfor %}
+events:
+{% for event in k3s_gitlab_agent_failed_events.resources | default([]) %}
+  - {{ [event.involvedObject.name | default(''), event.reason | default(''), event.message | default('')] | to_json }}
+{% endfor %}
+logs:
+{% for log in k3s_gitlab_agent_failed_logs.results | default([]) %}
+  - {{ [log.item.metadata.name, log.log_lines | default([])] | to_json }}
+{% endfor %}

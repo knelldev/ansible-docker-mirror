@@ -1,0 +1,5 @@
+---
+- name: "Playbook: os_prepare"
+  hosts: all
+  roles:
+    - os_prepare

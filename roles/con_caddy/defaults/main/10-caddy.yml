@@ -1,0 +1,137 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Third-party Caddy build with the caddy-dns/cloudflare module (CaddyBuilds).
+# Follows the newest release (Podman auto-update); tls_automate_names needs
+# Caddy >= 2.11.6. Pin a version tag here if needed.
+con_caddy_image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+
+# started | stopped. "stopped" renders and validates everything without
+# starting the public listener.
+con_caddy_systemd_service_state: started
+
+# ACME account email.
+con_caddy_acme_email: __REQUIRED__
+
+# Default ACME challenge for all sites: dns (DNS-01 through Cloudflare) or
+# http (HTTP-01/TLS-ALPN-01, needs ports 80/443 reachable from the internet).
+# A site can override it with its own acme_challenge key.
+con_caddy_acme_challenge: dns
+
+# Cloudflare API token (Zone:Read + DNS:Edit on the zones of the DNS-01
+# names). Required as soon as any site uses dns. Supply it from vault; it is
+# written only to a 0600 env file on the host.
+con_caddy_cloudflare_api_token: ""
+
+# Wildcard names whose certificates Caddy manages via DNS-01 without serving
+# them. Sites below that fall under a wildcard reuse it, so their names never
+# reach the public CT logs. Needs con_caddy_acme_challenge dns.
+# Example: ["*.example.com", "*.lab.example.com"]
+con_caddy_cert_wildcards: []
+
+# CIDRs allowed to send a PROXY protocol header on :443 (OPNsense Layer4 SNI
+# passthrough). Empty disables the listener wrapper. Clients from other
+# sources connect normally.
+con_caddy_proxy_protocol_allow: []
+
+# Podman networks Caddy joins to reach upstreams by container name, e.g.
+# http://gitlab:80. Empty keeps host networking. Non-empty switches Caddy to
+# these networks and publishes 80/tcp, 443/tcp and 443/udp instead: Podman
+# cannot combine host networking with other networks, and host loopback
+# upstreams (127.0.0.1) are then out of reach. Use "<name>.network" for a
+# Quadlet-managed network (systemd dependency), a plain name otherwise.
+# Example: ["gitlab_default.network"]
+con_caddy_networks: []
+
+# Raw Caddyfile lines added to the global options block, and raw top-level
+# Caddyfile content (snippets, extra site blocks) added before the sites.
+con_caddy_global_options_extra: ""
+con_caddy_extra_config: ""
+
+# Local files copied into <app_path>/conf/conf.d; the Caddyfile imports every
+# conf.d/*.caddy before the sites. Use them for snippets a site imports
+# through extra_config, or for whole site blocks. Example: ["files/sso.caddy"]
+con_caddy_conf_files: []
+
+# Default for the per-site noindex key: robots.txt "Disallow: /" and
+# X-Robots-Tag on every site. Set false for public sites.
+con_caddy_noindex: true
+
+# Security headers on every site, set only when the upstream did not send the
+# header itself. A site's security_headers dict overrides single entries (an
+# empty value drops one); security_headers: false disables them for the site.
+con_caddy_security_headers:
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Forward auth providers, referenced by a site's "auth" key. Each entry:
+#   url:           provider base URL (required)
+#   uri:           auth endpoint path on the provider (required)
+#   copy_headers:  response headers copied to the upstream
+#   proxy_paths:   path patterns proxied to the provider without auth
+#   extra_config:  raw lines inside the forward_auth block
+# "authentik" is built in from the two variables below; an entry with that
+# name here replaces it. Example (Authelia):
+#   authelia:
+#     url: http://authelia:9091
+#     uri: /api/authz/forward-auth
+#     copy_headers: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
+con_caddy_forward_auth: {}
+
+# Base URL of the authentik outpost for the built-in "authentik" provider.
+# Example: http://authentik-server:9000
+con_caddy_authentik_outpost_url: ""
+
+# Response headers copied from authentik to the upstream on forward auth.
+con_caddy_authentik_copy_headers:
+  - X-Authentik-Username
+  - X-Authentik-Groups
+  - X-Authentik-Entitlements
+  - X-Authentik-Email
+  - X-Authentik-Name
+  - X-Authentik-Uid
+  - X-Authentik-Jwt
+  - X-Authentik-Meta-Jwks
+  - X-Authentik-Meta-Outpost
+  - X-Authentik-Meta-Provider
+  - X-Authentik-Meta-App
+  - X-Authentik-Meta-Version
+
+# Sites served by this host. Keys per site (see README for details):
+#   name:             site address (required), e.g. app.example.com
+#   aliases:          extra names for the same site
+#   upstream:         URL or list of URLs; required unless redirect is set
+#   upstream_tls:     skip_verify to accept a self-signed upstream cert
+#   lb_policy:        Caddy lb_policy when upstream is a list, e.g. ip_hash
+#   noindex:          robots.txt "Disallow: /" and X-Robots-Tag; default
+#                     con_caddy_noindex
+#   headers_down:     dict of response headers to set
+#   security_headers: dict merged over con_caddy_security_headers, or false
+#   cors_origins:     allowed CORS origins, e.g. ["https://app.example.com"]
+#   cors_methods:     allowed CORS methods (default GET to OPTIONS)
+#   auth:             forward auth provider name, e.g. authentik
+#   auth_skip_paths:  Caddy path patterns that bypass forward auth
+#   block_paths:      Caddy path patterns answered with 404
+#   responses:        list of {path, body, content_type, status} static replies
+#   redirect:         target URL; everything not matched above gets a 302
+#   acme_challenge:   dns or http; overrides con_caddy_acme_challenge
+#   extra_config:     raw Caddyfile lines inside the site block
+#   proxy_extra_config: raw lines inside the reverse_proxy block
+con_caddy_sites: []
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_caddy_user_create), mode (default 0700) and recurse.
+con_caddy_dir_extra:
+  - name: conf
+  - name: errors
+  - name: data
+  - name: conf/conf.d
+  - name: config
+  - name: logs
+    mode: "0750"

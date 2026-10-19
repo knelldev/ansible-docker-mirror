@@ -2,7 +2,7 @@
 # Default Values for Role - Might contain placeholders for passwords - NOT live
 ###############################################################################
 ---
-# Setting sof other roles
+# Settings from other roles
 # Gitlab settings
 con_gitlab_external_url: "http://example.com/" # noqa var-naming[no-role-prefix]
 k3s_gitlab_runner_gitlab_external_url: "{{ con_gitlab_external_url }}"
@@ -11,13 +11,111 @@ k3s_gitlab_runner_gitlab_external_url: "{{ con_gitlab_external_url }}"
 k3s_gitlab_runner_namespace_create: true
 k3s_gitlab_runner_namespace: "gitlab-runner"
 k3s_gitlab_runner_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+k3s_gitlab_runner_helm_binary_path: /usr/local/bin/helm
 
 # Runner settings
-# Needs to be get from UI
-k3s_gitlab_runner_token: token
 k3s_gitlab_runner_concurrent: 50
+k3s_gitlab_runner_poll_timeout: 600
+k3s_gitlab_runner_run_untagged: true
 
-k3s_gitlab_runner_config: |
-  [[runners]]
-    [runners.kubernetes]
-      image = "python:3"
+# Managed runner identity and optional GitLab cleanup
+k3s_gitlab_runner_management_tag: ansible
+# Keep empty for compatibility with existing custom runner descriptions. Set a
+# prefix explicitly to include managed custom runners in lifecycle operations.
+k3s_gitlab_runner_description_prefix: ""
+# Generated T-shirt runners converge by default. Set false to retain stale ones.
+k3s_gitlab_runner_prune_stale_enabled: "{{ k3s_gitlab_runner_tshirt_enabled }}"
+# One-shot destructive reset for role-owned instance runners. Disable after use.
+k3s_gitlab_runner_reset_managed_instance_runners: false
+
+# Deployment health
+k3s_gitlab_runner_helm_wait: true
+k3s_gitlab_runner_helm_timeout: "10m"
+k3s_gitlab_runner_health_check_enabled: true
+k3s_gitlab_runner_health_check_retries: 12
+k3s_gitlab_runner_health_check_delay: 10
+k3s_gitlab_runner_failure_log_lines: 200
+
+# Runner manager availability. Automatic mode uses one replica on one node and
+# two replicas on clusters with at least two schedulable nodes.
+k3s_gitlab_runner_manager_replicas_auto: true
+k3s_gitlab_runner_manager_replicas: null
+k3s_gitlab_runner_manager_replicas_max: 2
+k3s_gitlab_runner_manager_pdb_enabled: true
+
+# Optional runner-manager metrics
+k3s_gitlab_runner_metrics_enabled: false
+k3s_gitlab_runner_service_monitor_enabled: false
+k3s_gitlab_runner_metrics_port: 9252
+
+# Optional ephemeral storage protection for job pods.
+k3s_gitlab_runner_ephemeral_storage_enabled: false
+k3s_gitlab_runner_ephemeral_storage_buffer_min_gib: 20
+k3s_gitlab_runner_ephemeral_storage_buffer_pct: 20
+
+# Hook scripts (pre/post build resource monitoring)
+# Set to false to disable hook scripts and their ConfigMap volume mount
+k3s_gitlab_runner_hooks_enabled: true
+k3s_gitlab_runner_hook_sample_interval_seconds: 5
+k3s_gitlab_runner_hook_memory_upgrade_threshold_pct: 80
+k3s_gitlab_runner_hook_memory_downgrade_threshold_pct: 40
+
+###############################################################################
+# T-Shirt sized runners (auto-registered via GitLab API)
+###############################################################################
+# Requires: a vault-provided API token with GitLab's `create_runner` scope.
+# Requires: GitLab >= 17.0
+# Sizes and limits are calculated automatically based on cluster resources.
+# Size definitions are in vars/main.yml (not user-changeable).
+k3s_gitlab_runner_tshirt_enabled: true
+# k3s_gitlab_runner_admin_token: ""  # Required when tshirt_enabled or custom runners without token
+
+# Resource calculation settings
+k3s_gitlab_runner_system_reserved_mb: 2048 # Memory reserved for system/k3s
+k3s_gitlab_runner_small_pool_pct: 50 # % of usable memory for xs/s/m (rest for l/xl/xxl)
+
+# Global force_reinstall flag - can be overridden per runner
+k3s_gitlab_runner_force_reinstall: false
+
+###############################################################################
+# Custom runners
+###############################################################################
+# If token is omitted, api_token or the admin token is used to auto-register the runner.
+# Each item supports:
+#   name:          (required) Helm release name and runner name
+#   api_token:     (optional) GitLab API token for auto-registration. If omitted, admin token is used.
+#                  Required when not using k3s_gitlab_runner_admin_token
+#   token:         (optional) Runner authentication token. When provided, skips all API operations
+#                  and goes straight to Helm deployment.
+#   gitlab_url:    (optional) Override GitLab URL (default: k3s_gitlab_runner_gitlab_external_url)
+#   concurrent:    (optional) Override max concurrent jobs (default: k3s_gitlab_runner_concurrent)
+#   image:         (optional) Default container image (default: python:3)
+#   poll_timeout:  (optional) Override poll timeout (default: k3s_gitlab_runner_poll_timeout)
+#   privileged:    (optional) Run DinD jobs with privileged flag (default: false)
+#   cache:         (optional) S3 cache configuration
+#     server:      S3 endpoint (e.g. "minio.example.com:9000")
+#     access_key:  S3 access key
+#     secret_key:  S3 secret key
+#     bucket:      Bucket name (e.g. "gitlab-runner-cache")
+#     insecure:    (optional) Use HTTP instead of HTTPS (default: true)
+#   extra_config:  (optional) Additional TOML config appended at [[runners]] level
+#                  Use this for cpu/memory limits, node selectors, tolerations, etc.
+#   runner_type:   (optional) "instance_type" (default), "group_type", or "project_type"
+#   group_id:      (optional) GitLab group ID (required when runner_type is "group_type")
+#   project_id:    (optional) GitLab project ID (required when runner_type is "project_type")
+#   tags:          (optional) Comma-separated tags for the runner
+#   description:   (optional) Runner description shown in GitLab UI
+#   force_reinstall: (optional) Force Helm chart reinstall/update (default: false)
+#
+# Token handling:
+# - If `token` is provided: skips ALL API operations and goes straight to Helm deployment.
+# - If `api_token` is provided: uses that token for API registration, bypasses admin_token.
+# - If neither is provided: falls back to k3s_gitlab_runner_admin_token for auto-registration.
+# - If NO token is provided: the role fails before it changes the cluster.
+k3s_gitlab_runner_config_list: []
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# k3s_gitlab_runner_user_create), mode (default 0700) and recurse.
+k3s_gitlab_runner_dir_extra: []

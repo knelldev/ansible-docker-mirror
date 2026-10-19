@@ -6,9 +6,9 @@
 con_gitlab_smtp_enable: false
 con_gitlab_smtp_address: "smtp.server"
 con_gitlab_smtp_port: "465"
-con_gitlab_smtp_user_name: "smtp user"
-con_gitlab_smtp_password: "smtp password"
-con_gitlab_smtp_domain: "example.com"
+con_gitlab_smtp_user_name: ""
+con_gitlab_smtp_password: ""
+con_gitlab_smtp_domain: ""
 con_gitlab_smtp_authentication: "login"
 con_gitlab_smtp_enable_starttls_auto: true
 con_gitlab_smtp_tls: false
