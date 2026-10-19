@@ -2,6 +2,10 @@
 # Default Values for Role - Might contain placeholders for passwords - NOT live
 ###############################################################################
 ---
+# Semaphore moves :latest to whatever it pushed last, an older branch too (2.18.31
+# after 2.19.16 on 2026-10-07); a DB migrated by a newer version then fails to
+# start. Pin a version tag here if needed.
+con_semaphore_image: docker.io/semaphoreui/semaphore:latest
 con_semaphore_expose: true
 con_semaphore_port: 3000
 con_semaphore_url: "http://localhost:{{ con_semaphore_port }}"
