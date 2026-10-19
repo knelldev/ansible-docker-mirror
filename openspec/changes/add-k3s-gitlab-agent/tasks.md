@@ -5,7 +5,7 @@
   GitLab API.
 - Plan state: built; offline verification done (2.1-2.3). 2.4 and 2.5 open.
 - Blocker for 2.4/2.5: separate approval for a lab run; KAS reachable at the
-  inventory's `k3s_gitlab_agent_kas_address` (lab: `wss://kas.gitlab.knell.dev`).
+  inventory's KAS address (lab: `ws://10.0.10.25:8150`).
 
 ## 1. Role
 
@@ -13,21 +13,24 @@
       vars, README, AGENTS.
 - [x] 1.2 Add `playbooks/k3s_gitlab_agent.yml`.
 - [x] 1.3 Input asserts: unique agent names, project set, every target with
-      `rules` or `cluster_role`, API token present.
+      `rules` or `cluster_role`, allowed KAS scheme; the API token via the
+      shared `__REQUIRED__` check.
 - [x] 1.4 Registration: find or create the agent; token Secret reuse or
       create (`no_log`).
 - [x] 1.5 Namespaces, Role/RoleBinding per target namespace.
-- [x] 1.6 Helm install with pinned chart and image, `rbac.create: false`,
-      `config.secretName`, KAS address and optional CA.
+- [x] 1.6 Helm install from a values file in `app_path` (latest chart and
+      server-version image unless pinned), `rbac.create: false`,
+      `config.secretName`, KAS address and optional CA, monitoring switch.
 - [x] 1.7 Automatic replica count from schedulable nodes (as the runner). Health check, failure diagnostics, secret-safe summary.
-- [x] 1.8 Rotation flag: new token, Secret update, rollout, revoke others.
+- [x] 1.8 Rotation flag: new token, Secret update, rollout via the token id
+      in `podAnnotations`, revoke others.
 - [x] 1.9 Update `roles/AGENTS.md` index and the root README playbook list.
 
 ## 2. Verification
 
 - [x] 2.1 `ansible-lint` (production) and `yamllint` on role and playbook.
 - [x] 2.2 `ansible-playbook --syntax-check playbooks/k3s_gitlab_agent.yml`.
-- [x] 2.3 Render the chart (`helm template`, pinned version) with the role's
+- [x] 2.3 Render the chart (`helm template`, 2.33.0) with the role's
       values: no ClusterRole(Binding), token only via Secret name.
 - [ ] 2.4 Lab run (needs approval): agent connects; agentk logs show no
       `forbidden` in its own namespace; a CI job in the config project runs
@@ -40,7 +43,7 @@ Run 2026-10-18 in the worktree, offline (no cluster, no GitLab API).
 
 - 2.1 `ansible-lint --offline roles/k3s_gitlab_agent playbooks/k3s_gitlab_agent.yml`
   (ansible-lint 26.10.1, core 2.21.5): `Passed: 0 failure(s), 0 warning(s) in
-  12 files ... Profile 'production' was required, and it passed.` It prints
+12 files ... Profile 'production' was required, and it passed.` It prints
   `resolved_fqcn` warnings for `kubernetes.core` modules because the
   collection is not in `./collections`; the existing `k3s_gitlab_runner` role
   shows the same. `yamllint roles/k3s_gitlab_agent playbooks/k3s_gitlab_agent.yml`
@@ -52,7 +55,7 @@ Run 2026-10-18 in the worktree, offline (no cluster, no GitLab API).
   sample vars file (dummy names, dummy API token), then `helm template`:
   - 2 replicas, default KAS: kinds Deployment, Service, ServiceAccount; 0
     ClusterRole/ClusterRoleBinding; no chart Secret; `serviceAccountName:
-    demo-app-agentk`; `secretName: demo-app-token`; image `agentk:v19.5.0`;
+demo-app-agentk`; `secretName: demo-app-token`; image `agentk:v19.5.0`;
     `--kas-address=wss://gitlab.example.test/-/kubernetes-agent/`;
     soft pod anti-affinity.
   - 1 replica, KAS override and CA: adds a ConfigMap and
@@ -70,6 +73,14 @@ Run 2026-10-18 in the worktree, offline (no cluster, no GitLab API).
   none; the role accepts 200/201 and 200/204), pagination of the agent and
   token lists (the role reads one page of 100), whether agentk needs rights
   in its own namespace (2.4).
+
+Rework 2026-10-19 (owner review), offline: KAS from parts, no pins, values
+file on the host, rotation via `podAnnotations`, no `set_fact`, monitoring
+switch, shared `__REQUIRED__` check fixed in all roles. Re-run of 2.1-2.3,
+plus the agent flow against a mocked GitLab API and cluster (first run,
+rerun creates nothing, two rotations, extra token at the limit, missing
+Secret at the limit, unready rollout). The evidence above is from the first
+build.
 
 ## Next Action
 

@@ -68,3 +68,18 @@ con_gitlab_kas_expose: "{{ con_gitlab_kas_external_url | length > 0 }}"
 con_gitlab_rb_custom: |
   # Add multiline config from gitlab.rb
   # here
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_gitlab_user_create), mode (default 0700) and recurse.
+con_gitlab_dir_extra:
+  - name: config
+    mode: "0755"
+  - name: logs
+    mode: "0755"
+  - name: data
+    mode: "0755"
+  - name: ca-custom
+    group: "{{ storage_group }}"
+    mode: "0770"

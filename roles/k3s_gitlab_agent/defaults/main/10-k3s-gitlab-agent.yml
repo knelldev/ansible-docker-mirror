@@ -8,20 +8,19 @@ k3s_gitlab_agent_gitlab_external_url: "{{ con_gitlab_external_url }}"
 
 # GitLab API token (vault): Maintainer on every config project, `api` scope.
 k3s_gitlab_agent_api_token: __REQUIRED__
-# The token travels to the GitLab API; verify its certificate by default.
-k3s_gitlab_agent_api_validate_certs: true
 
-# KAS address agentk dials. The default derives the main-domain form
-# wss://<host>/-/kubernetes-agent/ from the GitLab URL (ws:// for http).
-# Override it in the inventory when KAS has its own host, for example:
-#   k3s_gitlab_agent_kas_address: "wss://kas.gitlab.knell.dev"
+# KAS address agentk dials, built from parts. The defaults derive the
+# main-domain form wss://<host>/-/kubernetes-agent/ from the GitLab URL
+# (ws:// for http, port only when the URL has one). Set single parts, or the
+# whole address, in the inventory. Allowed schemes: grpc, grpcs, ws, wss.
+k3s_gitlab_agent_kas_scheme: "{{ 'wss' if (k3s_gitlab_agent_gitlab_external_url | urlsplit('scheme')) == 'https' else 'ws' }}"
+k3s_gitlab_agent_kas_host: "{{ k3s_gitlab_agent_gitlab_external_url | urlsplit('hostname') }}"
+k3s_gitlab_agent_kas_port: "{{ k3s_gitlab_agent_gitlab_external_url | urlsplit('port') or '' }}"
+k3s_gitlab_agent_kas_path: /-/kubernetes-agent/
 k3s_gitlab_agent_kas_address: >-
-  {{
-    ('wss' if (k3s_gitlab_agent_gitlab_external_url | urlsplit('scheme')) == 'https' else 'ws')
-    ~ '://'
-    ~ (k3s_gitlab_agent_gitlab_external_url | urlsplit('netloc'))
-    ~ '/-/kubernetes-agent/'
-  }}
+  {{ k3s_gitlab_agent_kas_scheme }}://{{ k3s_gitlab_agent_kas_host }}{{
+  (':' ~ k3s_gitlab_agent_kas_port) if (k3s_gitlab_agent_kas_port | string | length > 0) else ''
+  }}{{ k3s_gitlab_agent_kas_path }}
 # PEM of a private CA for KAS. Empty: system trust (public certificates).
 k3s_gitlab_agent_kas_ca_cert: ""
 
@@ -29,14 +28,20 @@ k3s_gitlab_agent_kas_ca_cert: ""
 k3s_gitlab_agent_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 k3s_gitlab_agent_helm_binary_path: /usr/local/bin/helm
 
-# Pinned chart and agentk image. Keep the image within one minor version of
-# the GitLab server (major.minor).
-k3s_gitlab_agent_chart_version: "2.33.0"
-k3s_gitlab_agent_image_tag: "v19.5.0"
-k3s_gitlab_agent_resources:
-  requests:
-    cpu: 50m
-    memory: 128Mi
+# Chart and agentk image. Empty chart version: latest chart. Empty image tag:
+# the GitLab server version (GET /api/v4/version), so agentk matches it.
+# Set either one to pin it.
+k3s_gitlab_agent_chart_version: ""
+k3s_gitlab_agent_image_tag: ""
+# agentk container resources. Empty: chart default (none). Example:
+#   k3s_gitlab_agent_resources:
+#     requests:
+#       cpu: 50m
+#       memory: 128Mi
+k3s_gitlab_agent_resources: {}
+# Prometheus metrics: the chart's metrics Service and prometheus.io/* scrape
+# annotations. false removes both; agentk still serves its health probes.
+k3s_gitlab_agent_monitoring: true
 
 # Replicas. Automatic mode uses one replica on one schedulable node and two
 # from two nodes on, with soft anti-affinity. A number overrides.
@@ -71,3 +76,11 @@ k3s_gitlab_agent_failure_log_lines: 100
 # On GitLab Free every project authorized in the agent's ci_access gets all of
 # the agent's rights. Use one agent per project (trust boundary).
 k3s_gitlab_agent_config_list: []
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# k3s_gitlab_agent_user_create), mode (default 0700) and recurse. The
+# per-agent directory for the Helm values file is created in agent.yml, only
+# on the host that runs Helm.
+k3s_gitlab_agent_dir_extra: []

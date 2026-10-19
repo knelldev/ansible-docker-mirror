@@ -1,48 +1,35 @@
 ---
-- name: Block for become=true
+# Shared by every role that stores files on the host; keep it identical.
+# Role-specific directories go into <role>_dir_extra (defaults), other
+# prerequisites and checks into a later numbered task file.
+- name: Prepare account and storage for {{ app_name }}
   become: true
   block:
-    - name: Record available root filesystem capacity
-      ansible.builtin.set_fact:
-        k3s_gitlab_runner_root_available_gib: >-
-          {{
-            (
-              ansible_mounts
-              | selectattr('mount', 'equalto', '/')
-              | map(attribute='size_available')
-              | first
-              | default(0)
-              | int
-            ) / 1073741824
-          }}
+    - name: Create user and group for {{ app_name }}
+      when: app_user_create | bool
+      block:
+        - name: Create group for {{ app_name }}
+          ansible.builtin.group:
+            name: "{{ app_group }}"
+            system: true
+            state: present
 
-    - name: Create role data directories
+        - name: Create user for {{ app_name }}
+          ansible.builtin.user:
+            name: "{{ app_user }}"
+            group: "{{ app_group }}"
+            system: true
+            create_home: false
+            state: present
+
+    - name: Create storage directories for {{ app_name }}
       ansible.builtin.file:
-        path: "{{ app_path }}/{{ item.name }}"
+        path: "{{ (app_path + '/' + item.name) | regex_replace('/$', '') }}"
         state: directory
-        owner: "{{ item.owner | default('root') }}"
-        group: "{{ item.group | default('data') }}"
-        mode: "{{ item.mode | default('0755') }}"
-      loop:
-        - name: ""
-
-    - name: Ensure runner hook directory exists
-      ansible.builtin.file:
-        path: "{{ app_path }}/scripts"
-        state: directory
-        mode: "0755"
-      when: k3s_gitlab_runner_hooks_enabled | bool
-
-    - name: Deploy runner pre-build hook
-      ansible.builtin.template:
-        src: pre-build.sh.j2
-        dest: "{{ app_path }}/scripts/pre-build.sh"
-        mode: "0755"
-      when: k3s_gitlab_runner_hooks_enabled | bool
-
-    - name: Deploy runner post-build hook
-      ansible.builtin.template:
-        src: post-build.sh.j2
-        dest: "{{ app_path }}/scripts/post-build.sh"
-        mode: "0755"
-      when: k3s_gitlab_runner_hooks_enabled | bool
+        owner: "{{ item.owner | default(app_user if app_user_create | bool else 'root') }}"
+        group: "{{ item.group | default(app_group if app_user_create | bool else storage_group) }}"
+        mode: "{{ item.mode | default('0700') }}"
+        recurse: "{{ item.recurse | default(false) }}"
+      loop: "{{ [{'name': ''}] + app_dir_extra }}"
+      loop_control:
+        label: "{{ item.name }}"

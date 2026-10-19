@@ -4,3 +4,7 @@ win_docker_version: latest
 # Add an ACL for the docker-users group to the docker_engine named pipe
 # Needed for using docker inside windows containers without admin permission.
 win_docker_pipe_group_acl: true
+
+# Local run fact (shared tasks/main.yml): off, facts.d is a Linux path;
+# Windows hosts are not covered.
+win_container_fact_enabled: false

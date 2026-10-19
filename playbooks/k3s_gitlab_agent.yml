@@ -1,5 +1,5 @@
 ---
 - name: "Playbook: k3s_gitlab_agent"
-  hosts: "{{ hosts_limit | default('all') }}"
+  hosts: all
   roles:
     - k3s_gitlab_agent

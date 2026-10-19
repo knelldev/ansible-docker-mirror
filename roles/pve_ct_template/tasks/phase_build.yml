@@ -119,11 +119,7 @@
       register: pve_ct_template_aplinfo
       no_log: true # request headers carry the token secret
 
-    - name: Pick the newest stock image
-      ansible.builtin.set_fact:
-        pve_ct_template_image: >-
-          {{ pve_ct_template_aplinfo.json.data | map(attribute='template')
-             | select('match', pve_ct_template_image_regex) | sort | last }}
+    # pve_ct_template_image (vars/main.yml): newest stock image in the index
 
     # Without url/src the module calls POST /nodes/{node}/aplinfo: the node
     # downloads from the Proxmox appliance index; skipped if present.

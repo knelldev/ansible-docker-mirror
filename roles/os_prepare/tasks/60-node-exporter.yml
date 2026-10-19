@@ -16,9 +16,13 @@
 
     - name: Set node_exporter arguments
       ansible.builtin.template:
-        src: node-exporter-override.conf.j2
-        dest: "/etc/systemd/system/{{ os_prepare_node_exporter_service }}.service.d/override.conf"
+        src: systemd-unit.j2
+        dest: "{{ item.path }}"
         mode: "0644"
+      loop:
+        - "{{ os_prepare_systemd_units.node_exporter_override }}"
+      loop_control:
+        label: "{{ item.path }}"
       register: os_prepare_node_exporter_override
 
     - name: Enable and start node_exporter

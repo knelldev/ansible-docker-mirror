@@ -8,8 +8,11 @@ Requirements
 ------------
 
 Requires Ansible Core 2.17 or newer, K3s with a working kubeconfig, Helm, and
-the `kubernetes.core` collection. GitLab API-managed runners additionally
-require a suitable API token. S3 cache storage is optional and external.
+the `kubernetes.core` collection. The role is cluster-only: run it against the
+K3s servers (controllers), e.g. `--limit <controller group>`. Cluster work runs
+once, on the first host of the play, and fails early when that host has no
+kubeconfig. GitLab API-managed runners additionally require a suitable API
+token. S3 cache storage is optional and external.
 
 Role Variables
 --------------
@@ -25,6 +28,12 @@ Role Variables
 | `k3s_gitlab_runner_ephemeral_storage_enabled`      | `false`            | Optional job disk limits                |
 | `k3s_gitlab_runner_hooks_enabled`                  | `true`             | Resource report hooks                   |
 | `k3s_gitlab_runner_metrics_enabled`                | `false`            | Runner manager metrics                  |
+
+Hook scripts (`k3s_gitlab_runner_hooks_enabled`) are applied as ConfigMap
+`runner-scripts` in the runner namespace and mounted read-only into job pods
+at `/opt/gitlab-runner/scripts`; the runner calls them with `sh`. A changed
+script reaches the next job; a changed mount or hook setting reaches the
+releases through the usual values change and Helm upgrade.
 
 T-shirt runners retain generated `docker-<size>`, `k8s-<size>`, and
 `shared-<size>` tags plus `ansible`. Custom runner tags are additive.
@@ -73,9 +82,11 @@ GitLab URL defaults from the repository.
 Example Playbook
 ----------------
 
-    - hosts: k3s_servers
+    - hosts: all
       roles:
         - k3s_gitlab_runner
+
+Run it with `ansible-playbook playbooks/k3s_gitlab_runner.yml --limit <controller group>`.
 
 License
 -------

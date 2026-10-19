@@ -15,12 +15,14 @@
 
     - name: Install weekly update units
       ansible.builtin.template:
-        src: "{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ item }}"
+        src: systemd-unit.j2
+        dest: "{{ item.path }}"
         mode: "0644"
       loop:
-        - dnf-automatic-weekly.service
-        - dnf-automatic-weekly.timer
+        - "{{ os_prepare_systemd_units.weekly_update_service }}"
+        - "{{ os_prepare_systemd_units.weekly_update_timer }}"
+      loop_control:
+        label: "{{ item.path }}"
 
     - name: Enable weekly update timer
       ansible.builtin.systemd_service:

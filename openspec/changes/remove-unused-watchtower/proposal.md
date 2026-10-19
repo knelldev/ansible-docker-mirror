@@ -22,3 +22,6 @@ Risks include unexpected updates, rollback difficulty, and orphaned operator
 expectations. The safer default is explicit opt-in until ownership is decided.
 
 Approval status: planning only.
+
+Decision 2026-10-19: the owner retired the role; `roles/con_watchtower/` is
+removed (see `tasks.md`).

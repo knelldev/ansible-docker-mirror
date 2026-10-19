@@ -3,6 +3,7 @@
 ###############################################################################
 ---
 storage_base_path: /data # noqa var-naming[no-role-prefix]
+storage_group: data # noqa var-naming[no-role-prefix]
 storage_base_path_win: C:\\data # noqa var-naming[no-role-prefix]
 
 http: # noqa var-naming[no-role-prefix]
@@ -10,4 +11,4 @@ http: # noqa var-naming[no-role-prefix]
   delay: 15
   retries_short: 3
   delay_short: 5
-  ssl_verify: false
+  ssl_verify: true

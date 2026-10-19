@@ -38,9 +38,10 @@
     os_prepare_weekly_update_oncalendar: Thu *-*-* 04:00:00
     os_prepare_weekly_update_reboot: when-needed
     os_container_auto_update_schedule: Thu *-*-* 04:30:00
+    os_container_rootless: true
     os_container_subid_min: 10000
     os_container_subid_max: 65533
-    os_container_default_netns: host
+    os_container_netns_host: true
     os_container_unprivileged_port_start: 80
     os_template_reset_confirm: true
   tasks:

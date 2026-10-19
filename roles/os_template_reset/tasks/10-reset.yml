@@ -54,6 +54,17 @@
         recurse: true
       register: os_template_reset_file_hits
 
+    # Run records of the build (local facts of every role) are not template
+    # content; this role writes none (os_template_reset_fact_enabled).
+    - name: Find local Ansible facts
+      ansible.builtin.find:
+        paths: /etc/ansible/facts.d
+        patterns: "*.fact"
+        file_type: file
+        hidden: true
+        recurse: false
+      register: os_template_reset_fact_hits
+
     - name: Remove found entries
       ansible.builtin.file:
         path: "{{ item }}"
@@ -62,7 +73,8 @@
         {{
           (os_template_reset_pattern_hits.results | map(attribute='files') | flatten
            + os_template_reset_dir_hits.files
-           + os_template_reset_file_hits.files)
+           + os_template_reset_file_hits.files
+           + os_template_reset_fact_hits.files)
           | map(attribute='path') | unique
         }}
 

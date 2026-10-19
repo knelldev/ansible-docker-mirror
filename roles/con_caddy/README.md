@@ -29,32 +29,33 @@ Shared defaults: `storage_base_path` (`/data`) and the `http` retry settings.
 
 ### defaults/main/10-caddy.yml
 
-| Variable                           | Default                                         | Description                                                                                         |
-| ---------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `con_caddy_image`                  | `docker.io/caddybuilds/caddy-cloudflare:2.11.7` | Caddy build with the `caddy-dns/cloudflare` module. Needs Caddy 2.11.6 or newer.                    |
-| `con_caddy_systemd_service_state`  | `started`                                       | `started` or `stopped`. `stopped` renders and validates without starting Caddy.                     |
-| `con_caddy_acme_email`             | `__REQUIRED__`                                  | ACME account email.                                                                                 |
-| `con_caddy_acme_challenge`         | `dns`                                           | Default ACME challenge: `dns` (Cloudflare DNS-01) or `http` (HTTP-01/TLS-ALPN-01).                  |
-| `con_caddy_cloudflare_api_token`   | `""`                                            | Cloudflare token; required when any site uses `dns`. Supply from vault. Only in `caddy.env` (0600). |
-| `con_caddy_cert_wildcards`         | `[]`                                            | Wildcards managed without being served, e.g. `["*.example.com"]`. Needs `dns`.                      |
-| `con_caddy_proxy_protocol_allow`   | `[]`                                            | CIDRs allowed to send a PROXY header on `:443`. Empty disables it.                                  |
-| `con_caddy_networks`               | `[]`                                            | Podman networks to join for container-name upstreams. Empty keeps host networking.                  |
-| `con_caddy_global_options_extra`   | `""`                                            | Raw Caddyfile lines added to the global options block.                                              |
-| `con_caddy_extra_config`           | `""`                                            | Raw top-level Caddyfile content (snippets, extra site blocks), placed before the sites.             |
-| `con_caddy_conf_files`             | `[]`                                            | Local `*.caddy` files copied into `<app_path>/conf/conf.d`, imported before the sites.              |
-| `con_caddy_noindex`                | `true`                                          | Default for the per-site `noindex` key. Set `false` for public sites.                               |
-| `con_caddy_security_headers`       | HSTS, nosniff, frame, referrer                  | Security headers on every site, set only when the upstream did not send them.                       |
-| `con_caddy_forward_auth`           | `{}`                                            | Forward auth providers by name; see below. Adds to or replaces the built-in `authentik`.            |
-| `con_caddy_authentik_outpost_url`  | `""`                                            | authentik outpost base URL for the built-in `authentik` provider.                                   |
-| `con_caddy_authentik_copy_headers` | authentik identity headers                      | Headers copied from authentik to the upstream.                                                      |
-| `con_caddy_sites`                  | `[]`                                            | Sites to serve; see below.                                                                          |
+| Variable                           | Default                                                          | Description                                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `con_caddy_image`                  | `ghcr.io/caddybuilds/caddy-cloudflare:latest`                    | Caddy build with the `caddy-dns/cloudflare` module. Needs Caddy 2.11.6 or newer; auto-updated.      |
+| `con_caddy_systemd_service_state`  | `started`                                                        | `started` or `stopped`. `stopped` renders and validates without starting Caddy.                     |
+| `con_caddy_acme_email`             | `__REQUIRED__`                                                   | ACME account email.                                                                                 |
+| `con_caddy_acme_challenge`         | `dns`                                                            | Default ACME challenge: `dns` (Cloudflare DNS-01) or `http` (HTTP-01/TLS-ALPN-01).                  |
+| `con_caddy_cloudflare_api_token`   | `""`                                                             | Cloudflare token; required when any site uses `dns`. Supply from vault. Only in `caddy.env` (0600). |
+| `con_caddy_cert_wildcards`         | `[]`                                                             | Wildcards managed without being served, e.g. `["*.example.com"]`. Needs `dns`.                      |
+| `con_caddy_proxy_protocol_allow`   | `[]`                                                             | CIDRs allowed to send a PROXY header on `:443`. Empty disables it.                                  |
+| `con_caddy_networks`               | `[]`                                                             | Podman networks to join for container-name upstreams. Empty keeps host networking.                  |
+| `con_caddy_global_options_extra`   | `""`                                                             | Raw Caddyfile lines added to the global options block.                                              |
+| `con_caddy_extra_config`           | `""`                                                             | Raw top-level Caddyfile content (snippets, extra site blocks), placed before the sites.             |
+| `con_caddy_conf_files`             | `[]`                                                             | Local `*.caddy` files copied into `<app_path>/conf/conf.d`, imported before the sites.              |
+| `con_caddy_dir_extra`              | `conf`, `errors`, `data`, `conf/conf.d`, `config`, `logs` (0750) | Directories under `<app_path>` created by the shared `00-prepare.yml`.                              |
+| `con_caddy_noindex`                | `true`                                                           | Default for the per-site `noindex` key. Set `false` for public sites.                               |
+| `con_caddy_security_headers`       | HSTS, nosniff, frame, referrer                                   | Security headers on every site, set only when the upstream did not send them.                       |
+| `con_caddy_forward_auth`           | `{}`                                                             | Forward auth providers by name; see below. Adds to or replaces the built-in `authentik`.            |
+| `con_caddy_authentik_outpost_url`  | `""`                                                             | authentik outpost base URL for the built-in `authentik` provider.                                   |
+| `con_caddy_authentik_copy_headers` | authentik identity headers                                       | Headers copied from authentik to the upstream.                                                      |
+| `con_caddy_sites`                  | `[]`                                                             | Sites to serve; see below.                                                                          |
 
 ### vars/main.yml
 
-Derived `app_name` (`caddy`), `app_path` (`/data/caddy`), `app_user`,
-`app_group`, `con_caddy_storage_extra_dirs` (`conf`, `conf/conf.d`, `errors`,
-`data`, `config`, `logs`), `con_caddy_forward_auth_all` (the built-in `authentik`
-provider merged with `con_caddy_forward_auth`) and `con_caddy_dns_used`.
+The shared `app_*` lines (`app_name` `caddy`, `app_path` `/data/caddy`),
+`con_caddy_forward_auth_all` (the built-in
+`authentik` provider merged with `con_caddy_forward_auth`) and
+`con_caddy_dns_used`.
 
 ### Certificates
 

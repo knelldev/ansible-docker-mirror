@@ -414,12 +414,22 @@
         state: present
         kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
         validate_certs: "{{ http.ssl_verify }}"
-        definition: "{{ lookup('template', 'priority-class.yml.j2') | from_yaml }}"
+        definition: "{{ lookup('template', 'priority-class.yaml.j2') | from_yaml }}"
       when: >-
         k3s_gitlab_runner_tshirt_runners
         | selectattr('key', 'in', ['l', 'xl', 'xxl'])
         | list
         | length > 0
+
+    # Job pods mount it (values.yaml.j2); a changed script reaches the next job.
+    - name: Apply runner hook scripts ConfigMap
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('ansible.builtin.template', 'configmap.yaml.j2') | from_yaml }}"
+        apply: true
+        kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      when: k3s_gitlab_runner_hooks_enabled | bool
 
     # --- All runners (t-shirt + custom) ---
     - name: Register and deploy all runners

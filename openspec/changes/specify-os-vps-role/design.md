@@ -17,3 +17,10 @@ should be traceable through the setup described in `docs/execution.md`.
 Static checks must cover syntax, lint, variable validation, and rendered
 configuration. Controlled host checks must verify effective settings, service
 health, connectivity, and repeat-run stability.
+
+## Decision 2026-10-19 (owner)
+
+The VPS baseline is `os_prepare` + `os_wg`; there is no separate `os_vps`
+role. The `roles/os_vps/` contract stub is removed. Tuning or hardening found
+missing later goes into `os_prepare` as an optional part (like its nftables
+allowlist) or into a role of its own.

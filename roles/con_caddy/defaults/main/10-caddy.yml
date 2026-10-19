@@ -3,8 +3,9 @@
 ###############################################################################
 ---
 # Third-party Caddy build with the caddy-dns/cloudflare module (CaddyBuilds).
-# Pinned to a full Caddy version; tls_automate_names needs Caddy >= 2.11.6.
-con_caddy_image: docker.io/caddybuilds/caddy-cloudflare:2.11.7
+# Follows the newest release (Podman auto-update); tls_automate_names needs
+# Caddy >= 2.11.6. Pin a version tag here if needed.
+con_caddy_image: ghcr.io/caddybuilds/caddy-cloudflare:latest
 
 # started | stopped. "stopped" renders and validates everything without
 # starting the public listener.
@@ -121,3 +122,16 @@ con_caddy_authentik_copy_headers:
 #   extra_config:     raw Caddyfile lines inside the site block
 #   proxy_extra_config: raw lines inside the reverse_proxy block
 con_caddy_sites: []
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_caddy_user_create), mode (default 0700) and recurse.
+con_caddy_dir_extra:
+  - name: conf
+  - name: errors
+  - name: data
+  - name: conf/conf.d
+  - name: config
+  - name: logs
+    mode: "0750"

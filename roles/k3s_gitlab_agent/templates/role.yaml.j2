@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# Role of agent {{ agent_item.name }} in target namespace {{ item.namespace }}.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ k3s_gitlab_agent_target_role_name | to_json }}
+  namespace: {{ item.namespace | to_json }}
+  labels:
+    app.kubernetes.io/managed-by: ansible
+    app.kubernetes.io/instance: {{ agent_item.name | to_json }}
+rules: {{ item.rules | to_json }}

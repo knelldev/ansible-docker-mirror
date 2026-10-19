@@ -13,15 +13,26 @@ namespace-scoped RBAC only.
 - The agent token exists only in Secret `<name>-token` in the agent namespace.
   It never goes into Helm values, task output or files on the target; every
   task that sends the API token or handles the agent token uses `no_log`.
+- Cluster-only: run against K3s servers (controllers). An early run_once
+  assert in `05-validate.yml` fails when the run_once host has no kubeconfig.
+- The Helm values file lives only on the host that runs Helm (run_once), at
+  `{{ app_path }}/<name>/values.yaml`, passed via `values_files`; no other
+  host paths. `00-prepare.yml` only creates `app_path`.
 - Chart values keep `rbac.create: false` and
   `config.operational_container_scanning.enabled: false`. Rights come only from
   Roles/RoleBindings per target namespace.
-- Chart version and agentk image tag stay pinned together in defaults.
+- No version pins in defaults: empty chart version means latest, empty image
+  tag means the GitLab server version. Pins are inventory overrides.
+- No `set_fact`: derived values are lazy expressions in `vars/main.yml`;
+  manifests and summaries are templates. Values over runtime results stay
+  plain expressions or `dict(...)`, never dict/list literals, so the shared
+  `__REQUIRED__` check can template them before those results exist.
+- Check mode is not supported.
 
 ### Task Structure
 
-1. `00-prepare.yml` — input checks, before any API call or cluster change
-2. `10-install.yml` — Helm repo, replica count, per-agent loop, summary
+1. `00-prepare.yml` — `app_path` only; `05-validate.yml` — kubeconfig and input checks
+2. `10-install.yml` — Helm repo, server version, nodes, per-agent loop, summary
 
 ### Utility Files (Not Auto-Discovered)
 
@@ -33,7 +44,7 @@ namespace-scoped RBAC only.
 ### Run
 
 ```bash
-ansible-playbook playbooks/k3s_gitlab_agent.yml -i <inventory>
+ansible-playbook playbooks/k3s_gitlab_agent.yml --limit <controller group>
 ```
 
 ### Post-Run

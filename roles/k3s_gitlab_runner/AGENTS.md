@@ -8,12 +8,21 @@ Deploy and configure GitLab Runner on a K3s Kubernetes cluster via Helm.
 
 - Follows the role layout in [`roles/AGENTS.md`](../AGENTS.md) but deviates from the container pattern: this is a Helm/Kubernetes deployment, not Podman/Quadlet.
 - Variables prefixed `k3s_gitlab_runner_*`
+- Cluster-only: run against K3s servers (controllers). Cluster work runs once
+  (run_once); an early run_once assert in `01-prepare-k3s.yml` fails when that
+  host has no kubeconfig. Root disk and memory facts of the play hosts feed
+  the sizing.
+- Hook scripts live in ConfigMap `runner-scripts` in the runner namespace,
+  rendered from `pre-build.sh.j2`/`post-build.sh.j2` (`configmap.yaml.j2`).
+  Job pods mount it read-only at `/opt/gitlab-runner/scripts` and run the
+  hooks with `sh` (ConfigMap files have no exec bit). No host paths.
 
-### Task Structure (3 numbered task files + utility)
+### Task Structure (4 numbered task files + utility)
 
-1. `00-prepare.yml` — system preparation
-2. `01-prepare-k3s.yml` — K3s cluster-specific preparation
-3. `10-install.yml` — GitLab Runner install via Helm chart
+1. `00-prepare.yml` — the shared data directories
+2. `01-prepare-k3s.yml` — kubeconfig assert, runner namespace
+3. `02-prepare-host.yml` — root filesystem capacity fact for storage sizing
+4. `10-install.yml` — sizing, GitLab lifecycle, hook ConfigMap, Helm releases
 
 ### Utility Files (Not Auto-Discovered)
 
@@ -24,7 +33,7 @@ Deploy and configure GitLab Runner on a K3s Kubernetes cluster via Helm.
 ### Run
 
 ```bash
-ansible-playbook playbooks/k3s_gitlab_runner.yml -i <inventory>
+ansible-playbook playbooks/k3s_gitlab_runner.yml -i <inventory> --limit <controller group>
 ```
 
 ### Post-Run

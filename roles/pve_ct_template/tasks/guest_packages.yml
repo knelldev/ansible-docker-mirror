@@ -1,15 +1,6 @@
 ---
-# Helper (guest): installed packages as name-version-release lines
-# -> pve_ct_template_packages
+# Helper (guest): refresh the package facts behind
+# pve_ct_template_packages (vars/main.yml, name-version-release lines)
 - name: Read installed packages
   ansible.builtin.package_facts:
     manager: rpm
-
-- name: Store package list
-  vars:
-    _p: "{{ ansible_facts.packages.values() | flatten }}"
-  ansible.builtin.set_fact:
-    pve_ct_template_packages: >-
-      {{ _p | map(attribute='name')
-         | zip(_p | map(attribute='version'), _p | map(attribute='release'))
-         | map('join', '-') | unique | sort }}

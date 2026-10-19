@@ -27,21 +27,26 @@ imported from the runner role.
 
 ```yaml
 k3s_gitlab_agent_gitlab_external_url: "{{ con_gitlab_external_url }}"
-k3s_gitlab_agent_api_token: __REQUIRED__        # Maintainer, api scope (vault)
-k3s_gitlab_agent_kas_address: "wss://<host of external url>/-/kubernetes-agent/"
-k3s_gitlab_agent_kas_ca_cert: ""                # PEM, only for a private CA
-k3s_gitlab_agent_chart_version: "2.33.0"
-k3s_gitlab_agent_image_tag: "v19.5.0"           # match GitLab major.minor
-k3s_gitlab_agent_replicas_auto: true          # 1 on one node, 2 on >= 2 (as the runner)
+k3s_gitlab_agent_api_token: __REQUIRED__ # Maintainer, api scope (vault)
+k3s_gitlab_agent_kas_scheme: wss # ws for an http URL
+k3s_gitlab_agent_kas_host: <host of external url>
+k3s_gitlab_agent_kas_port: "" # port of the URL, if any
+k3s_gitlab_agent_kas_path: /-/kubernetes-agent/
+k3s_gitlab_agent_kas_address: <built from the parts>
+k3s_gitlab_agent_kas_ca_cert: "" # PEM, only for a private CA
+k3s_gitlab_agent_chart_version: "" # latest; pin in the inventory
+k3s_gitlab_agent_image_tag: "" # GitLab server version
+k3s_gitlab_agent_monitoring: true
+k3s_gitlab_agent_replicas_auto: true # 1 on one node, 2 on >= 2 (as the runner)
 k3s_gitlab_agent_replicas: null
-k3s_gitlab_agent_rotate_token: false            # one-shot
+k3s_gitlab_agent_rotate_token: false # one-shot
 k3s_gitlab_agent_config_list:
-  - name: kube-01-cv                            # agent name = release name
-    project: lukas/kube_01_cv                   # config project, path or id
-    namespace: gitlab-agent-kube-01-cv          # where agentk runs
+  - name: kube-01-cv # agent name = release name
+    project: lukas/kube_01_cv # config project, path or id
+    namespace: gitlab-agent-kube-01-cv # where agentk runs
     targets:
       - namespace: kube-01-cv
-        rules: [...]                            # a Role, or:
+        rules: [...] # a Role, or:
         # cluster_role: edit                    # RoleBinding to a ClusterRole
 ```
 
@@ -53,21 +58,21 @@ Project path above is illustrative; the real one comes from the inventory.
 2. Read Secret `<name>-token` in the agent namespace. Present and no rotation:
    reuse. Absent: `POST /projects/:id/cluster_agents/:agent_id/tokens` and
    write the `token` field into the Secret in the next task.
-3. Rotation: create a new token, replace the Secret, restart the deployment,
-   wait ready, then `DELETE` every other active token of that agent.
+3. Rotation: create a new token, replace the Secret; the Secret's token id
+   goes into the chart's `podAnnotations`, so Helm rolls the pods; wait
+   ready, then `DELETE` every other active token of that agent.
 4. The chart gets `config.secretName`, never `config.token`, so the token is
    not in Helm values or release records.
 
-The Secret is the only state; no values file on disk (unlike the runner,
-whose values carry the token).
+The Secret is the only token state. The chart values are rendered to
+`{{ app_path }}/<name>/values.yaml` on the host (as the runner does, but
+without the token) and passed via `values_files`.
 
 The Secret carries the token id as annotation `gitlab.com/agent-token-id`, so
 a rotation can keep that token and the summary can name other active tokens
-(orphans). At the two-token limit a rotation first revokes the tokens the
-Secret does not hold; without rotation the run fails with their ids. The
-GitLab API certificate is verified by default
-(`k3s_gitlab_agent_api_validate_certs: true`), unlike the runner's
-`http.ssl_verify: false`, because the API token is sent to it.
+(orphans). When a new token is needed at the two-token limit, the role first
+revokes the tokens the Secret does not hold. GitLab API calls use the shared
+`http.ssl_verify`, like the runner.
 
 ### RBAC
 
@@ -111,24 +116,29 @@ node failure takes both. An explicit count overrides.
 ### Chart values
 
 `config.kasAddress`, `config.secretName`, `config.kasCaCert` (when set),
-`image.tag`, `replicas`, `rbac.create: false`, small `resources` requests.
-Receptive mode and OCS are set off explicitly. Observability stays at the
-chart default (on): the chart's liveness and readiness probes use its port
-8080, and turning it off only drops the port declaration and annotations.
+`image.tag` (left out when empty), `replicas`, `rbac.create: false`,
+`resources` (default `{}`), `podAnnotations` with the token id. Receptive
+mode and OCS are set off explicitly. `config.observability.enabled` follows
+`k3s_gitlab_agent_monitoring` (default on): off drops the metrics Service and
+the chart's `prometheus.io/*` annotations; the probes on port 8080 keep
+working. `serviceMonitor` stays off (needs the Prometheus operator CRD).
 
-The KAS default is the main-domain form; the lab's final address is
-`wss://kas.gitlab.knell.dev`, set as an inventory override (README example).
+The KAS default is the main-domain form; the lab uses
+`ws://10.0.10.25:8150`, set as parts in the inventory (README example).
 
 ### Health and output
 
 `helm --wait`, then ready pods of the release; on failure the last log lines
 and events (as the runner does). Summary: agent name, id, project, created or
-reused, token created/reused/rotated, revoked count, target namespaces. No
-token, no rendered values.
+reused, token created/reused/rotated, token id, revoked token ids, target
+namespaces. No token.
+
+### Check mode
+
+Not supported: the house roles include tasks dynamically from `main.yml`.
 
 ## Open Points
 
-- Whether `gitlab.knell.dev` presents a public certificate on the internal
-  path (then no `kas_ca_cert`).
-- Whether k3s pods resolve `gitlab.knell.dev` to the internal address.
+- Open: whether the lab KAS at `ws://10.0.10.25:8150` (no TLS) is the final
+  address, or a TLS address replaces it (then maybe `kas_ca_cert`).
 - Later: prune agents and namespaces no longer listed.

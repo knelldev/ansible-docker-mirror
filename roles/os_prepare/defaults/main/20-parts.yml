@@ -3,14 +3,15 @@
 # Switchable parts. Defaults keep re-runs on existing hosts unchanged.
 ###############################################################################
 ---
-# dnf-automatic (daily timer from 20-configure.yml). Default: download only,
-# as existing hosts did before (their old config never applied updates).
+# dnf-automatic (daily timer from 20-configure.yml). Default: check and
+# report in motd only, as existing hosts did before (their old config put
+# apply_updates, download_updates and reboot in sections dnf 4 ignores).
 os_prepare_dnf_automatic_upgrade_type: default # default | security | ...
 os_prepare_dnf_automatic_apply_updates: false
-os_prepare_dnf_automatic_reboot: never # never | when-changed | when-needed
+os_prepare_dnf_automatic_reboot: never # dnf 4: never | when-changed | when-needed
 
 # Group that owns storage_base_path
-os_prepare_data_group: data
+os_prepare_data_group: "{{ storage_group }}"
 
 # Local admin user: SSH key only, locked password, passwordless sudo
 os_prepare_admin_enabled: false
@@ -34,3 +35,10 @@ os_prepare_weekly_update_enabled: true
 os_prepare_weekly_update_oncalendar: Thu *-*-* 04:00:00
 os_prepare_weekly_update_upgrade_type: default
 os_prepare_weekly_update_reboot: never
+
+# nftables allowlist (DRAFT, tasks/80-firewall.yml is a TODO): input policy
+# drop; SSH only from os_prepare_firewall_ssh_allow. The part must refuse an
+# empty allowlist and apply rules with a timed rollback.
+os_prepare_firewall_enabled: false
+os_prepare_firewall_ssh_port: 22
+os_prepare_firewall_ssh_allow: [] # source CIDRs, IPv4 or IPv6

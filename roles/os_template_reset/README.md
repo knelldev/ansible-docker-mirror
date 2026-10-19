@@ -3,7 +3,9 @@
 Resets a guest right before it becomes a template: truncates
 `/etc/machine-id`, removes SSH host keys, the first-boot marker, hostname,
 NetworkManager connection files, logs, dnf cache, shell histories, `/tmp`,
-`/var/tmp`, and as the last step root's `authorized_keys`.
+`/var/tmp`, the local Ansible facts (`/etc/ansible/facts.d/*.fact`, run
+records of the build) and as the last step root's `authorized_keys`. It
+writes no run fact itself.
 
 ## Requirements
 
@@ -21,6 +23,7 @@ NetworkManager connection files, logs, dnf cache, shell histories, `/tmp`,
 | `os_template_reset_clear_files_in`      | `/var/log`                                                  | files removed, directories kept          |
 | `os_template_reset_truncate_machine_id` | `true`                                                      | empty `/etc/machine-id`                  |
 | `os_template_reset_remove_root_keys`    | `true`                                                      | remove `/root/.ssh/authorized_keys` last |
+| `os_template_reset_fact_enabled`        | `false`                                                     | no run fact after the reset              |
 
 ## Dependencies
 

@@ -1,6 +1,0 @@
-# TODO(add-edge-vps-role):
-# - CrowdSec agent as a Podman Quadlet (os_edge_crowdsec_image), journald
-#   sshd acquisition, registered as a machine on os_edge_crowdsec_lapi_url
-#   over WireGuard; local LAPI disabled.
-# - Optional host nftables bouncer when os_edge_crowdsec_bouncer_enabled.
----

@@ -70,15 +70,16 @@ Configure:
 1. The repository and the intended branch or tag.
 2. An external inventory or inventory repository.
 3. SSH keys and API credentials as Semaphore secrets.
-4. An environment for non-secret variables such as `hosts_limit`.
-5. A task template with the playbook, inventory, and required limit.
+4. An environment for non-secret variables.
+5. A task template with the playbook, inventory, and required limit. Playbooks
+   target `hosts: all`; the limit picks the hosts.
 
 Example template values:
 
 ```text
 Playbook: playbooks/os_prepare.yml
 Inventory: /path/to/inventory
-Extra variables: hosts_limit=container_hosts
+CLI args: ["--limit", "container_hosts"]
 ```
 
 Run the template manually first. Add schedules or approval rules after the

@@ -1,0 +1,19 @@
+---
+- name: We already got ssl certs block (remove in hopefully a year)
+  become: true
+  when: con_gitlab_ssl_certs_write
+  block:
+    - name: Create gitlab ssl dir
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item }}"
+        state: directory
+        mode: "0770"
+      loop:
+        - config/ssl
+
+    - name: Copy certs into ssl dir
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ item.path }}"
+        mode: "0660"
+      loop: "{{ con_gitlab_ssl_certs_dict }}"

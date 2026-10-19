@@ -39,3 +39,7 @@ os_template_reset_truncate_machine_id: true
 # Remove /root/.ssh/authorized_keys as the very last step (ends root login
 # with the build key)
 os_template_reset_remove_root_keys: true
+
+# No run fact: the reset removes all local facts (identity of the build run)
+# and must not write a new one afterwards.
+os_template_reset_fact_enabled: false

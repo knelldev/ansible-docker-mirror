@@ -8,7 +8,7 @@ Configure Linux hosts for containerized workloads (Podman runtime, users, sudo, 
 
 - Follows standard `os_*` role layout defined in [`roles/AGENTS.md`](../AGENTS.md)
 - Variables prefixed `os_container_*`
-- Rootless defaults (`30-rootless.yml`) apply only when their variables are set.
+- Rootless settings (`30-rootless.yml`) sit behind switches that also revert them when off; no virtualization detection.
 
 ## Work Guidance
 

@@ -36,20 +36,10 @@ public key.
 
 ### Requirement: SSH only from the allowlist
 
-The VPS SHALL accept SSH only from `os_edge_ssh_allow` and over the tunnel,
+The VPS SHALL accept SSH only from `os_prepare_firewall_ssh_allow` and over the tunnel,
 and the role SHALL refuse to apply firewall rules when that list is empty.
 
 #### Scenario: Empty allowlist
 
-- **WHEN** `os_edge_ssh_allow` is empty
+- **WHEN** `os_prepare_firewall_ssh_allow` is empty
 - **THEN** the role fails before changing the firewall
-
-### Requirement: CrowdSec reports to OPNsense
-
-The VPS SHALL run a CrowdSec agent with the sshd collection that sends alerts
-to the OPNsense LAPI over the tunnel.
-
-#### Scenario: SSH brute force
-
-- **WHEN** an address fails SSH logins repeatedly on the VPS
-- **THEN** the alert appears on the OPNsense LAPI

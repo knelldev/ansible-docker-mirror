@@ -15,16 +15,20 @@ and registering agentk needs a role, like the runner.
 - Per configured agent: register it in its config project through the REST API
   when missing, create one agent token when the cluster holds none, keep that
   token only in a Kubernetes Secret, and install the `gitlab/gitlab-agent` Helm
-  chart (pinned chart version and agentk image tag) pointing at that Secret.
+  chart pointing at that Secret. No version pins by default: latest chart,
+  agentk tag from the GitLab server version; both can be pinned in the
+  inventory.
 - Turn the chart's cluster-wide RBAC off (`rbac.create`, a ClusterRoleBinding,
   default `cluster-admin`; and operational container scanning, which the chart
   enables by default with its own ClusterRole and ClusterRoleBinding) and grant the agent's ServiceAccount a Role and RoleBinding
   per listed target namespace instead, with rules or a referenced ClusterRole
   given per namespace. Nothing cluster-wide by default.
-- Derive the KAS address from the GitLab URL
-  (`wss://<host>/-/kubernetes-agent/`), overridable; optional CA PEM for KAS.
+- Build the KAS address from scheme, host, port and path, derived from the
+  GitLab URL (`wss://<host>/-/kubernetes-agent/`); every part and the whole
+  address are overridable; optional CA PEM for KAS.
 - Optional one-shot token rotation flag: create a new token, update the
-  Secret, roll the deployment, revoke the old token.
+  Secret; the token id in `podAnnotations` makes Helm roll the pods; then
+  revoke every other token.
 - Health: Helm wait, ready agentk pods, failure diagnostics, a secret-safe
   summary.
 
@@ -54,7 +58,8 @@ and registering agentk needs a role, like the runner.
 - No GitLab server settings (`gitlab.rb` KAS URLs), proxy allowlist or DNS.
 - No `access_as` impersonation: Premium/Ultimate only. On Free, CI jobs inherit
   the agent ServiceAccount's rights, so the per-namespace Role is the boundary.
-- No GitOps/Flux, no observability or operational container scanning.
+- No GitOps/Flux, no operational container scanning. Prometheus metrics
+  (chart observability) are on by default and can be switched off.
 - No cleanup of agents removed from the inventory (listed in the design as a
   later option).
 - No live deployment in this change without separate approval.
@@ -75,10 +80,10 @@ and registering agentk needs a role, like the runner.
   environments and protected branches (set in the config project).
 - Risk: the token is returned only once by the API. Mitigation: the Secret is
   written in the same run; if the run fails between creation and the Secret,
-  the next run creates a second token (limit two active) and the summary
-  names the orphan to revoke.
+  the next run creates a second token (limit two active); the next rotation
+  revokes the orphan.
 - Risk: agentk version must match GitLab major.minor (±1 minor). Mitigation:
-  image tag pinned in defaults next to the chart version.
+  the image tag follows the GitLab server version unless pinned.
 
 Approval status: approved by the user on 2026-10-18 to build with offline
 checks only (lint, syntax check, `helm template`). Not approved: git commit,

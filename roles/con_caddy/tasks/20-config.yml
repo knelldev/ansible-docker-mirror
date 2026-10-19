@@ -6,8 +6,8 @@
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: "{{ app_path }}/conf/conf.d/{{ item | basename }}"
-        owner: root
-        group: root
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
         mode: "0644"
       loop: "{{ con_caddy_conf_files }}"
       notify:
@@ -21,8 +21,8 @@
       ansible.builtin.template:
         src: Caddyfile.j2
         dest: "{{ app_path }}/conf/Caddyfile"
-        owner: root
-        group: root
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
         mode: "0644"
         validate: >-
           podman run --rm --network none --security-opt label=disable

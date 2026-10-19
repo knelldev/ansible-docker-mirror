@@ -1,3 +1,0 @@
-# TODO(add-edge-vps-role): install wireguard-tools and nftables; Podman comes
-# from os_container. Blocked on the target OS decision (Debian or EL).
----

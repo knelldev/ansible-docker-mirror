@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+schedulable_nodes: {{ k3s_gitlab_agent_schedulable_node_count | int }}
+replicas: {{ k3s_gitlab_agent_replicas_effective | int }}
+chart_version: {{ (k3s_gitlab_agent_chart_version or 'latest') | to_json }}
+image_tag: {{ k3s_gitlab_agent_image_tag_effective | to_json }}
+kas_address: {{ k3s_gitlab_agent_kas_address | trim | to_json }}
+monitoring: {{ k3s_gitlab_agent_monitoring | bool | to_json }}
+rotation: {{ k3s_gitlab_agent_rotate_token | bool | to_json }}
+agents: {{ k3s_gitlab_agent_config_list | map(attribute='name') | list | to_json }}

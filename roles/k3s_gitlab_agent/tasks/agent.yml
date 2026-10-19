@@ -1,305 +1,165 @@
 ---
 # Per-agent flow, included from 10-install.yml with loop_var agent_item.
-# Every task that sends the API token or handles the agent token uses no_log.
-- name: Normalize agent {{ agent_item.name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_name: "{{ agent_item.name }}"
-    k3s_gitlab_agent_namespace: "{{ agent_item.namespace | default('gitlab-agent-' ~ agent_item.name) }}"
-    k3s_gitlab_agent_project_url: >-
-      {{ k3s_gitlab_agent_api_url }}/projects/{{ agent_item.project | string | urlencode | replace('/', '%2F') }}
-    k3s_gitlab_agent_service_account: "{{ agent_item.name }}-agentk"
-    k3s_gitlab_agent_secret_name: "{{ agent_item.name }}-token"
-    k3s_gitlab_agent_token_state: reused
-    k3s_gitlab_agent_revoked_count: 0
+# Names, URLs and token lists (k3s_gitlab_agent_item_*) are lazy expressions
+# in vars/main.yml over agent_item and the results registered here;
+# manifests are templates. Every task that sends the API token or handles the agent
+# token uses no_log.
 
 # --- Registration ---
-- name: Read GitLab agents of project for {{ k3s_gitlab_agent_name }}
+- name: Read GitLab agents of project for {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents?per_page=100"
-    method: GET
+    url: "{{ k3s_gitlab_agent_item_agents_url }}?per_page=100"
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
-    status_code: 200
+    validate_certs: "{{ http.ssl_verify }}"
   register: k3s_gitlab_agent_existing
   no_log: true
 
-- name: Resolve existing agent id for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_id: >-
-      {{
-        k3s_gitlab_agent_existing.json
-        | selectattr('name', 'equalto', k3s_gitlab_agent_name)
-        | map(attribute='id') | first | default('')
-      }}
-
-- name: Register GitLab agent {{ k3s_gitlab_agent_name }}
+- name: Register GitLab agent {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents"
+    url: "{{ k3s_gitlab_agent_item_agents_url }}"
     method: POST
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
     body_format: json
     body:
-      name: "{{ k3s_gitlab_agent_name }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
+      name: "{{ agent_item.name }}"
+    validate_certs: "{{ http.ssl_verify }}"
     status_code: [200, 201]
   register: k3s_gitlab_agent_created
-  when: k3s_gitlab_agent_id | string | length == 0
+  when: k3s_gitlab_agent_item_existing_id | length == 0
   changed_when: true
   no_log: true
 
-- name: Record agent identity for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_identity: "{{ 'reused' if k3s_gitlab_agent_created is skipped else 'created' }}"
-    k3s_gitlab_agent_id: >-
-      {{ k3s_gitlab_agent_id if k3s_gitlab_agent_created is skipped else k3s_gitlab_agent_created.json.id }}
-
-# --- Namespace and token Secret ---
-- name: Create agent namespace for {{ k3s_gitlab_agent_name }}
+# --- Namespace and token ---
+- name: Create agent namespace for {{ agent_item.name }}
   kubernetes.core.k8s:
     api_version: v1
     kind: Namespace
-    name: "{{ k3s_gitlab_agent_namespace }}"
-    state: present
+    name: "{{ k3s_gitlab_agent_item_namespace }}"
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
 
-- name: Read token Secret for {{ k3s_gitlab_agent_name }}
+- name: Read token Secret for {{ agent_item.name }}
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
-    namespace: "{{ k3s_gitlab_agent_namespace }}"
-    name: "{{ k3s_gitlab_agent_secret_name }}"
+    namespace: "{{ k3s_gitlab_agent_item_namespace }}"
+    name: "{{ k3s_gitlab_agent_item_secret_name }}"
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
   register: k3s_gitlab_agent_secret
   no_log: true
 
-- name: Record token Secret state for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_secret_present: >-
-      {{
-        k3s_gitlab_agent_secret.resources | length > 0
-        and (k3s_gitlab_agent_secret.resources[0].data.token | default('') | length > 0)
-      }}
-    k3s_gitlab_agent_secret_token_id: >-
-      {{
-        (k3s_gitlab_agent_secret.resources[0].metadata.annotations | default({}))[k3s_gitlab_agent_token_id_annotation]
-        | default('') | string
-        if k3s_gitlab_agent_secret.resources | length > 0
-        else ''
-      }}
-  no_log: true
-
-- name: Read active tokens of agent {{ k3s_gitlab_agent_name }}
+- name: Read active tokens of agent {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents/{{ k3s_gitlab_agent_id }}/tokens?per_page=100"
-    method: GET
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}?per_page=100"
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
-    status_code: 200
-  register: k3s_gitlab_agent_tokens_before
+    validate_certs: "{{ http.ssl_verify }}"
+  register: k3s_gitlab_agent_tokens
   no_log: true
 
-- name: Record active token ids of agent {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_active_token_ids: >-
-      {{
-        (
-          (k3s_gitlab_agent_tokens_before.json | rejectattr('status', 'defined') | list)
-          + (
-            k3s_gitlab_agent_tokens_before.json
-            | selectattr('status', 'defined')
-            | selectattr('status', 'equalto', 'active')
-            | list
-          )
-        )
-        | map(attribute='id') | map('string') | list
-      }}
-    k3s_gitlab_agent_needs_token: >-
-      {{ not (k3s_gitlab_agent_secret_present | bool) or (k3s_gitlab_agent_rotate_token | bool) }}
-
-- name: Select tokens to revoke before rotation of {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_pre_revoke_ids: >-
-      {{
-        k3s_gitlab_agent_active_token_ids
-        | reject('equalto', k3s_gitlab_agent_secret_token_id)
-        | list
-        if (
-          k3s_gitlab_agent_rotate_token | bool
-          and k3s_gitlab_agent_secret_present | bool
-          and k3s_gitlab_agent_active_token_ids | length >= 2
-          and k3s_gitlab_agent_secret_token_id | length > 0
-        )
-        else []
-      }}
-
-# GitLab allows two active tokens per agent. A rotation at the limit first
-# revokes the tokens the Secret does not hold, since it revokes them anyway.
-- name: Revoke unused tokens before rotation of {{ k3s_gitlab_agent_name }}
+# A new token is needed when the Secret holds none or on rotation. At
+# GitLab's limit of two active tokens, the unused ones are revoked first.
+- name: Revoke unused tokens of agent {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents/{{ k3s_gitlab_agent_id }}/tokens/{{ item }}"
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}/{{ item }}"
     method: DELETE
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
+    validate_certs: "{{ http.ssl_verify }}"
     status_code: [200, 204]
-  loop: "{{ k3s_gitlab_agent_pre_revoke_ids }}"
+  loop: "{{ k3s_gitlab_agent_item_pre_revoke_ids }}"
   changed_when: true
   no_log: true
 
-- name: Record pre-rotation revocations of {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_revoked_count: "{{ k3s_gitlab_agent_pre_revoke_ids | length }}"
-    k3s_gitlab_agent_active_token_ids: >-
-      {{ k3s_gitlab_agent_active_token_ids | reject('in', k3s_gitlab_agent_pre_revoke_ids) | list }}
-
-- name: Require room for a new token of {{ k3s_gitlab_agent_name }}
-  ansible.builtin.assert:
-    that:
-      - k3s_gitlab_agent_active_token_ids | length < 2
-    fail_msg: >-
-      Agent {{ k3s_gitlab_agent_name }} already has two active tokens (ids
-      {{ k3s_gitlab_agent_active_token_ids | join(', ') }}) and no usable token
-      Secret {{ k3s_gitlab_agent_namespace }}/{{ k3s_gitlab_agent_secret_name }}.
-      Revoke a token in GitLab (Operate > Kubernetes clusters) and rerun.
-    quiet: true
-  when: k3s_gitlab_agent_needs_token | bool
-
-- name: Create agent token for {{ k3s_gitlab_agent_name }}
+- name: Create agent token for {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents/{{ k3s_gitlab_agent_id }}/tokens"
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}"
     method: POST
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
     body_format: json
-    body:
-      name: "{{ k3s_gitlab_agent_name }}-{{ now(utc=true).strftime('%Y%m%dT%H%M%SZ') }}"
-      description: "Managed by Ansible role k3s_gitlab_agent; held in Secret {{ k3s_gitlab_agent_namespace }}/{{ k3s_gitlab_agent_secret_name }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
+    body: "{{ k3s_gitlab_agent_item_token_body }}"
+    validate_certs: "{{ http.ssl_verify }}"
     status_code: [200, 201]
   register: k3s_gitlab_agent_new_token
-  when: k3s_gitlab_agent_needs_token | bool
+  when: k3s_gitlab_agent_item_needs_token | bool
   changed_when: true
   no_log: true
 
-- name: Write token Secret for {{ k3s_gitlab_agent_name }}
+- name: Write token Secret for {{ agent_item.name }}
   kubernetes.core.k8s:
-    state: present
+    definition: "{{ lookup('ansible.builtin.template', 'secret.yaml.j2') | from_yaml }}"
     apply: true
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
-    definition:
-      apiVersion: v1
-      kind: Secret
-      type: Opaque
-      metadata:
-        name: "{{ k3s_gitlab_agent_secret_name }}"
-        namespace: "{{ k3s_gitlab_agent_namespace }}"
-        labels:
-          app.kubernetes.io/managed-by: ansible
-          app.kubernetes.io/instance: "{{ k3s_gitlab_agent_name }}"
-        annotations: >-
-          {{
-            {
-              k3s_gitlab_agent_token_id_annotation: k3s_gitlab_agent_new_token.json.id | string,
-              k3s_gitlab_agent_agent_id_annotation: k3s_gitlab_agent_id | string
-            }
-          }}
-      data:
-        token: "{{ k3s_gitlab_agent_new_token.json.token | b64encode }}"
-  when: k3s_gitlab_agent_needs_token | bool
+  when: k3s_gitlab_agent_new_token is not skipped
   no_log: true
 
-- name: Record token state for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_token_state: >-
-      {{ 'rotated' if (k3s_gitlab_agent_rotate_token | bool and k3s_gitlab_agent_secret_present | bool) else 'created' }}
-    k3s_gitlab_agent_secret_token_id: "{{ k3s_gitlab_agent_new_token.json.id | string }}"
-  when: k3s_gitlab_agent_needs_token | bool
-
 # --- Namespace-scoped RBAC per target ---
-- name: Create target namespaces for {{ k3s_gitlab_agent_name }}
+- name: Create target namespaces for {{ agent_item.name }}
   kubernetes.core.k8s:
     api_version: v1
     kind: Namespace
     name: "{{ item.namespace }}"
-    state: present
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
   loop: "{{ agent_item.targets }}"
   loop_control:
     label: "{{ item.namespace }}"
 
-- name: Apply target Roles for {{ k3s_gitlab_agent_name }}
+- name: Apply target Roles for {{ agent_item.name }}
   kubernetes.core.k8s:
-    state: present
+    definition: "{{ lookup('ansible.builtin.template', 'role.yaml.j2') | from_yaml }}"
     apply: true
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
-    definition:
-      apiVersion: rbac.authorization.k8s.io/v1
-      kind: Role
-      metadata:
-        name: "gitlab-agent-{{ k3s_gitlab_agent_name }}"
-        namespace: "{{ item.namespace }}"
-        labels:
-          app.kubernetes.io/managed-by: ansible
-          app.kubernetes.io/instance: "{{ k3s_gitlab_agent_name }}"
-      rules: "{{ item.rules }}"
   loop: "{{ agent_item.targets | selectattr('rules', 'defined') | list }}"
   loop_control:
     label: "{{ item.namespace }}"
 
-# Binding names differ by role kind because roleRef is immutable.
-- name: Apply target RoleBindings for {{ k3s_gitlab_agent_name }}
+- name: Apply target RoleBindings for {{ agent_item.name }}
   kubernetes.core.k8s:
-    state: present
+    definition: "{{ lookup('ansible.builtin.template', 'rolebinding.yaml.j2') | from_yaml }}"
     apply: true
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
-    definition:
-      apiVersion: rbac.authorization.k8s.io/v1
-      kind: RoleBinding
-      metadata:
-        name: >-
-          {{
-            'gitlab-agent-' ~ k3s_gitlab_agent_name
-            if item.rules is defined
-            else 'gitlab-agent-' ~ k3s_gitlab_agent_name ~ '-' ~ (item.cluster_role | replace(':', '-'))
-          }}
-        namespace: "{{ item.namespace }}"
-        labels:
-          app.kubernetes.io/managed-by: ansible
-          app.kubernetes.io/instance: "{{ k3s_gitlab_agent_name }}"
-      roleRef:
-        apiGroup: rbac.authorization.k8s.io
-        kind: "{{ 'Role' if item.rules is defined else 'ClusterRole' }}"
-        name: "{{ 'gitlab-agent-' ~ k3s_gitlab_agent_name if item.rules is defined else item.cluster_role }}"
-      subjects:
-        - kind: ServiceAccount
-          name: "{{ k3s_gitlab_agent_service_account }}"
-          namespace: "{{ k3s_gitlab_agent_namespace }}"
   loop: "{{ agent_item.targets }}"
   loop_control:
     label: "{{ item.namespace }}"
 
 # --- Helm release ---
-- name: Render values for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_helm_values: "{{ lookup('ansible.builtin.template', 'values.yaml.j2') | from_yaml }}"
+# The values file stays on the host that runs Helm (run_once, like the rest
+# of 10-install.yml) for a manual `helm upgrade -f`. It holds no token; the
+# token id in podAnnotations rolls the pods on rotation.
+- name: Create values directory for {{ agent_item.name }}
+  ansible.builtin.file:
+    path: "{{ k3s_gitlab_agent_item_values_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
 
-- name: Deploy Helm chart for {{ k3s_gitlab_agent_name }}
+- name: Write values for {{ agent_item.name }}
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: "{{ k3s_gitlab_agent_item_values_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+# Updates the chart repo cache once, with the first agent.
+- name: Deploy Helm chart for {{ agent_item.name }}
   kubernetes.core.helm:
-    release_name: "{{ k3s_gitlab_agent_name }}"
+    release_name: "{{ agent_item.name }}"
     chart_ref: gitlab/gitlab-agent
-    chart_version: "{{ k3s_gitlab_agent_chart_version }}"
-    release_namespace: "{{ k3s_gitlab_agent_namespace }}"
-    update_repo_cache: true
-    release_values: "{{ k3s_gitlab_agent_helm_values }}"
+    chart_version: "{{ k3s_gitlab_agent_chart_version | default(omit, true) }}"
+    release_namespace: "{{ k3s_gitlab_agent_item_namespace }}"
+    update_repo_cache: "{{ agent_index == 0 }}"
+    values_files:
+      - "{{ k3s_gitlab_agent_item_values_path }}"
     kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
     binary_path: "{{ k3s_gitlab_agent_helm_binary_path }}"
     validate_certs: "{{ http.ssl_verify }}"
@@ -307,113 +167,22 @@
     timeout: "{{ k3s_gitlab_agent_helm_timeout }}"
   register: k3s_gitlab_agent_helm
 
-# A new token in an existing Secret is read by agentk only at start.
-- name: Read agentk deployment for {{ k3s_gitlab_agent_name }}
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    namespace: "{{ k3s_gitlab_agent_namespace }}"
-    label_selectors:
-      - "app.kubernetes.io/instance={{ k3s_gitlab_agent_name }}"
-    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
-    validate_certs: "{{ http.ssl_verify }}"
-  register: k3s_gitlab_agent_deployments
-  when: k3s_gitlab_agent_token_state == 'rotated'
-
-- name: Restart agentk after token rotation for {{ k3s_gitlab_agent_name }}
-  kubernetes.core.k8s:
-    state: patched
-    api_version: apps/v1
-    kind: Deployment
-    namespace: "{{ k3s_gitlab_agent_namespace }}"
-    name: "{{ item.metadata.name }}"
-    kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
-    validate_certs: "{{ http.ssl_verify }}"
-    definition:
-      spec:
-        template:
-          metadata:
-            annotations:
-              kubectl.kubernetes.io/restartedAt: "{{ now(utc=true).isoformat() }}"
-  loop: "{{ k3s_gitlab_agent_deployments.resources | default([]) }}"
-  loop_control:
-    label: "{{ item.metadata.name }}"
-  when: k3s_gitlab_agent_token_state == 'rotated'
-
-- name: Check agentk health for {{ k3s_gitlab_agent_name }}
+- name: Check agentk health for {{ agent_item.name }}
   ansible.builtin.include_tasks: health.yml
 
-# --- Revoke the agent's other tokens after a successful rotation ---
-- name: Read active tokens after rotation of {{ k3s_gitlab_agent_name }}
+# After a successful rotation, revoke every token except the Secret's.
+- name: Revoke old tokens of agent {{ agent_item.name }}
   ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents/{{ k3s_gitlab_agent_id }}/tokens?per_page=100"
-    method: GET
-    headers:
-      PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
-    status_code: 200
-  register: k3s_gitlab_agent_tokens_after
-  when: k3s_gitlab_agent_rotate_token | bool
-  no_log: true
-
-- name: Select tokens to revoke after rotation of {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_revoke_ids: >-
-      {{
-        (
-          (k3s_gitlab_agent_tokens_after.json | rejectattr('status', 'defined') | list)
-          + (
-            k3s_gitlab_agent_tokens_after.json
-            | selectattr('status', 'defined')
-            | selectattr('status', 'equalto', 'active')
-            | list
-          )
-        )
-        | map(attribute='id') | map('string')
-        | reject('equalto', k3s_gitlab_agent_secret_token_id)
-        | list
-      }}
-  when: k3s_gitlab_agent_rotate_token | bool
-
-- name: Revoke other tokens of agent {{ k3s_gitlab_agent_name }}
-  ansible.builtin.uri:
-    url: "{{ k3s_gitlab_agent_project_url }}/cluster_agents/{{ k3s_gitlab_agent_id }}/tokens/{{ item }}"
+    url: "{{ k3s_gitlab_agent_item_tokens_url }}/{{ item }}"
     method: DELETE
     headers:
       PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
-    validate_certs: "{{ k3s_gitlab_agent_api_validate_certs }}"
+    validate_certs: "{{ http.ssl_verify }}"
     status_code: [200, 204]
-  loop: "{{ k3s_gitlab_agent_revoke_ids | default([]) }}"
-  when: k3s_gitlab_agent_rotate_token | bool
+  loop: "{{ k3s_gitlab_agent_item_post_revoke_ids }}"
   changed_when: true
   no_log: true
 
-- name: Record agent summary for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_summary_records: >-
-      {{
-        k3s_gitlab_agent_summary_records + [{
-          'name': k3s_gitlab_agent_name,
-          'id': k3s_gitlab_agent_id | string,
-          'project': agent_item.project | string,
-          'agent': k3s_gitlab_agent_identity,
-          'namespace': k3s_gitlab_agent_namespace,
-          'service_account': k3s_gitlab_agent_service_account,
-          'token': k3s_gitlab_agent_token_state,
-          'token_id_in_secret': k3s_gitlab_agent_secret_token_id | default('', true) or 'unknown (no annotation)',
-          'revoked': (k3s_gitlab_agent_revoked_count | int) + (k3s_gitlab_agent_revoke_ids | default([]) | length),
-          'other_active_tokens': (
-            []
-            if k3s_gitlab_agent_rotate_token | bool
-            else k3s_gitlab_agent_active_token_ids
-            | reject('equalto', k3s_gitlab_agent_secret_token_id)
-            | list
-          ),
-          'helm_changed': k3s_gitlab_agent_helm.changed | default(false),
-          'targets': agent_item.targets | map(attribute='namespace') | list
-        }]
-      }}
-
-- name: Reset per-agent results for {{ k3s_gitlab_agent_name }}
-  ansible.builtin.set_fact:
-    k3s_gitlab_agent_revoke_ids: []
+- name: Show summary for agent {{ agent_item.name }}
+  ansible.builtin.debug:
+    msg: "{{ lookup('ansible.builtin.template', 'summary-agent.yaml.j2') | from_yaml }}"

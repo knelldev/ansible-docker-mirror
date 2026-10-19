@@ -18,6 +18,10 @@ Build, test and replace Proxmox LXC templates through the Proxmox API.
   templates share a name.
 - Phase blocks record failures in facts instead of failing, so the finish
   play always runs.
+- Facts only for run state that later plays or other hosts read (VMIDs,
+  results via `hostvars`, the notes); values derived from registered results
+  are lazy expressions in `vars/main.yml`; the notes text is
+  `templates/notes.txt.j2`.
 
 ## Work Guidance
 

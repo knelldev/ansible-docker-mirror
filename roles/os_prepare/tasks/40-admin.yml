@@ -26,19 +26,23 @@
         group: "{{ os_prepare_admin_user }}"
         mode: "0700"
 
-    - name: Set admin authorized_keys
+    - name: Set admin authorized_keys and sudo
       ansible.builtin.copy:
-        content: "{{ os_prepare_admin_pubkeys | join('\n') }}\n"
-        dest: "/home/{{ os_prepare_admin_user }}/.ssh/authorized_keys"
-        owner: "{{ os_prepare_admin_user }}"
-        group: "{{ os_prepare_admin_user }}"
-        mode: "0600"
-
-    - name: Allow admin passwordless sudo
-      ansible.builtin.copy:
-        content: "{{ os_prepare_admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
-        dest: "/etc/sudoers.d/{{ os_prepare_admin_user }}"
-        owner: root
-        group: root
-        mode: "0440"
-        validate: /usr/sbin/visudo -cf %s
+        content: "{{ item.content }}"
+        dest: "{{ item.dest }}"
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: "{{ item.mode }}"
+        validate: "{{ item.validate | default(omit) }}"
+      loop:
+        - content: "{{ os_prepare_admin_pubkeys | join('\n') }}\n"
+          dest: /home/{{ os_prepare_admin_user }}/.ssh/authorized_keys
+          owner: "{{ os_prepare_admin_user }}"
+          mode: "0600"
+        - content: "{{ os_prepare_admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+          dest: /etc/sudoers.d/{{ os_prepare_admin_user }}
+          owner: root
+          mode: "0440"
+          validate: /usr/sbin/visudo -cf %s
+      loop_control:
+        label: "{{ item.dest }}"

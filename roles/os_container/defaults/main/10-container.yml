@@ -10,11 +10,21 @@ os_container_auto_update_schedule: Wed *-*-* 02:00:00
 os_container_auto_systemd_enabled: true
 os_container_auto_systemd_state: restarted
 
-# Rootless defaults (unset = no change; OS and Podman defaults stay)
-# Subordinate ID range for new users in /etc/login.defs, e.g. 10000/65533
-# os_container_subid_min: 10000
-# os_container_subid_max: 65533
-# Default network namespace for all Podman users (containers.conf.d drop-in)
-# os_container_default_netns: host
-# Lowest port unprivileged processes may bind (sysctl.d drop-in)
-# os_container_unprivileged_port_start: 80
+# Rootless Podman. Each switch also reverts its setting when turned off.
+# true: subordinate ID range for new users in /etc/login.defs; false removes
+# these lines again (OS defaults). Each new user gets subid_count IDs; the
+# default caps it at the range size, so a small range (LXC) goes to one user.
+os_container_rootless: false
+os_container_subid_min: 100000
+os_container_subid_max: 600100000
+os_container_subid_count: "{{ [65536, (os_container_subid_max | int) - (os_container_subid_min | int) + 1] | min }}"
+
+# true: default network namespace "host" for all Podman users, e.g. where
+# /dev/net/tun is missing (drop-in /etc/containers/containers.conf.d/50-os-container.conf).
+os_container_netns_host: false
+
+# Lowest port unprivileged processes may bind, e.g. 80 for a rootless proxy.
+# Unset (null): no unit, kernel default 1024. Ports below 1024 are a
+# hardening and monitoring signal, so keep it off unless a rootless
+# service needs a low port.
+os_container_unprivileged_port_start: null

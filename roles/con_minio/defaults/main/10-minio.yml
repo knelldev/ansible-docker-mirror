@@ -26,3 +26,12 @@ con_minio_buckets:
   - name: bucket_name
     expire: false
     expire_days: 90
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# con_minio_user_create), mode (default 0700) and recurse.
+con_minio_dir_extra:
+  - name: data
+    group: "{{ storage_group }}"
+    mode: "0770"

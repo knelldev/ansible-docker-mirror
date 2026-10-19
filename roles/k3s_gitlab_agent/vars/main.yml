@@ -1,10 +1,16 @@
 ---
-# The role keeps no files on the target (the token Secret is the only state),
-# so app_path and app_user do not apply.
-app_name: "{{ role_name.split('_')[1:] | join('_') }}" # noqa var-naming[no-role-prefix]
+app_name: "{{ lookup('ansible.builtin.vars', role_name + '_name', default=role_name.split('_')[1:] | join('_')) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ lookup('ansible.builtin.vars', role_name + '_path', default=storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ lookup('ansible.builtin.vars', role_name + '_user', default=app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ lookup('ansible.builtin.vars', role_name + '_group', default=app_user) }}" # noqa var-naming[no-role-prefix]
+app_user_create: "{{ lookup('ansible.builtin.vars', role_name + '_user_create', default=false) }}" # noqa var-naming[no-role-prefix]
+app_dir_extra: "{{ lookup('ansible.builtin.vars', role_name + '_dir_extra', default=[]) }}" # noqa var-naming[no-role-prefix]
 
 k3s_gitlab_agent_api_url: >-
   {{ k3s_gitlab_agent_gitlab_external_url | regex_replace('/+$', '') }}/api/v4
+
+# Schemes agentk accepts for its KAS address.
+k3s_gitlab_agent_kas_schemes: [grpc, grpcs, ws, wss]
 
 # Kubernetes name rules: agent name is used in namespace, Secret, Role and
 # release names, so keep gitlab-agent-<name> within 63 characters.
@@ -12,3 +18,121 @@ k3s_gitlab_agent_name_pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 k3s_gitlab_agent_name_max_length: 50
 k3s_gitlab_agent_token_id_annotation: gitlab.com/agent-token-id
 k3s_gitlab_agent_agent_id_annotation: gitlab.com/agent-id
+
+###############################################################################
+# Derived values, evaluated lazily where they are used (not settings)
+###############################################################################
+# The shared __REQUIRED__ check in tasks/main.yml templates every role var
+# before the runtime results these read exist. It skips a value that is
+# undefined as a whole, but fails on an undefined inside a YAML or Jinja
+# dict/list literal. So values over runtime results are plain expressions or
+# dict(...) calls; manifests and summaries with such values are templates.
+
+# --- Cluster (results registered in 10-install.yml) ---
+k3s_gitlab_agent_schedulable_node_count: >-
+  {{
+    k3s_gitlab_agent_nodes.resources
+    | map(attribute='spec.unschedulable', default=false)
+    | reject('equalto', true)
+    | list | length
+  }}
+k3s_gitlab_agent_replicas_effective: >-
+  {{
+    k3s_gitlab_agent_replicas | int
+    if k3s_gitlab_agent_replicas is not none
+    else (
+      [[1, k3s_gitlab_agent_schedulable_node_count | int] | max, k3s_gitlab_agent_replicas_max | int] | min
+      if k3s_gitlab_agent_replicas_auto | bool
+      else 1
+    )
+  }}
+# An explicit image tag wins; otherwise the server version (19.5.0-ee -> v19.5.0).
+k3s_gitlab_agent_image_tag_effective: >-
+  {{
+    k3s_gitlab_agent_image_tag
+    if k3s_gitlab_agent_image_tag | length > 0
+    else 'v' ~ (k3s_gitlab_agent_server_version.json.version | regex_replace('^([0-9]+\.[0-9]+\.[0-9]+).*$', '\1'))
+  }}
+
+# --- Per agent: agent_item is the loop item of agent.yml; the results read
+# here are registered there for the current agent ---
+k3s_gitlab_agent_item_namespace: "{{ agent_item.namespace | default('gitlab-agent-' ~ agent_item.name) }}"
+k3s_gitlab_agent_item_service_account: "{{ agent_item.name }}-agentk"
+k3s_gitlab_agent_item_secret_name: "{{ agent_item.name }}-token"
+k3s_gitlab_agent_item_values_path: "{{ app_path }}/{{ agent_item.name }}/values.yaml"
+k3s_gitlab_agent_item_selector: "app.kubernetes.io/instance={{ agent_item.name }}"
+# GitLab API URLs
+k3s_gitlab_agent_item_agents_url: >-
+  {{ k3s_gitlab_agent_api_url }}/projects/{{ agent_item.project | string | urlencode | replace('/', '%2F') }}/cluster_agents
+k3s_gitlab_agent_item_tokens_url: "{{ k3s_gitlab_agent_item_agents_url }}/{{ k3s_gitlab_agent_item_id }}/tokens"
+
+# Agent id: from the agent list, or from the registration of this run.
+k3s_gitlab_agent_item_existing_id: >-
+  {{ k3s_gitlab_agent_existing.json | selectattr('name', 'equalto', agent_item.name) | map(attribute='id') | first | default('') | string }}
+k3s_gitlab_agent_item_id: "{{ k3s_gitlab_agent_created.json.id | default(k3s_gitlab_agent_item_existing_id) | string }}"
+
+# Token Secret as read before this run's token step.
+k3s_gitlab_agent_item_secret: "{{ k3s_gitlab_agent_secret.resources | first | default({}) }}"
+k3s_gitlab_agent_item_secret_token_id: >-
+  {{ (k3s_gitlab_agent_item_secret.metadata.annotations | default({}))[k3s_gitlab_agent_token_id_annotation] | default('') | string }}
+k3s_gitlab_agent_item_needs_token: >-
+  {{ (k3s_gitlab_agent_item_secret.data.token | default('') | length == 0) or (k3s_gitlab_agent_rotate_token | bool) }}
+k3s_gitlab_agent_item_token_body: >-
+  {{
+    dict(
+      name=agent_item.name ~ '-' ~ now(utc=true).strftime('%Y%m%dT%H%M%SZ'),
+      description='Managed by Ansible role k3s_gitlab_agent; held in Secret '
+        ~ k3s_gitlab_agent_item_namespace ~ '/' ~ k3s_gitlab_agent_item_secret_name
+    )
+  }}
+# Token id the Secret holds after the token step; it goes into podAnnotations.
+k3s_gitlab_agent_item_token_id: "{{ k3s_gitlab_agent_new_token.json.id | default(k3s_gitlab_agent_item_secret_token_id) | string }}"
+
+# Active tokens as read before a new token is created (entries with another
+# status are ignored).
+k3s_gitlab_agent_item_active_token_ids: >-
+  {{
+    k3s_gitlab_agent_tokens.json
+    | rejectattr('status', 'defined')
+    | list
+    + (k3s_gitlab_agent_tokens.json | selectattr('status', 'defined') | selectattr('status', 'equalto', 'active') | list)
+    | map(attribute='id') | map('string') | list
+  }}
+# GitLab allows two active tokens per agent. At the limit, the tokens the
+# Secret does not hold (unused) are revoked before a new one is created.
+k3s_gitlab_agent_item_pre_revoke_ids: >-
+  {{
+    k3s_gitlab_agent_item_active_token_ids | reject('equalto', k3s_gitlab_agent_item_secret_token_id) | list
+    if (k3s_gitlab_agent_item_needs_token | bool and k3s_gitlab_agent_item_active_token_ids | length >= 2)
+    else []
+  }}
+# After a rotation (a new token in the Secret), every token read before is old.
+k3s_gitlab_agent_item_post_revoke_ids: >-
+  {{
+    k3s_gitlab_agent_item_active_token_ids | reject('in', k3s_gitlab_agent_item_pre_revoke_ids) | list
+    if (k3s_gitlab_agent_rotate_token | bool and k3s_gitlab_agent_new_token is not skipped)
+    else []
+  }}
+
+# --- Per target: item is the target in the RBAC loops of agent.yml ---
+k3s_gitlab_agent_target_role_name: "gitlab-agent-{{ agent_item.name }}"
+
+# --- Health (results registered in health.yml) ---
+# Ready: every deployment observed its latest generation and has the wanted
+# number of ready, updated replicas.
+k3s_gitlab_agent_rollout_ready: >-
+  {{
+    k3s_gitlab_agent_rollout.resources | length > 0
+    and (k3s_gitlab_agent_rollout.resources | rejectattr('status.observedGeneration', 'defined') | list | length) == 0
+    and (
+      k3s_gitlab_agent_rollout.resources
+      | selectattr('status.readyReplicas', 'defined')
+      | selectattr('status.updatedReplicas', 'defined')
+      | selectattr('status.readyReplicas', 'ge', k3s_gitlab_agent_replicas_effective | int)
+      | selectattr('status.updatedReplicas', 'ge', k3s_gitlab_agent_replicas_effective | int)
+      | selectattr('status.replicas', 'equalto', k3s_gitlab_agent_replicas_effective | int)
+      | list | length
+    ) == (k3s_gitlab_agent_rollout.resources | length)
+    and (k3s_gitlab_agent_rollout.resources | map(attribute='status.observedGeneration') | list)
+    == (k3s_gitlab_agent_rollout.resources | map(attribute='metadata.generation') | list)
+  }}

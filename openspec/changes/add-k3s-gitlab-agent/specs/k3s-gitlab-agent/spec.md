@@ -31,8 +31,9 @@ in task output, Helm values or files on the target.
 #### Scenario: Rotation
 
 - **WHEN** the rotation flag is set
-- **THEN** the role creates a new token, updates the Secret, waits for ready
-  agentk pods, and revokes the agent's other active tokens
+- **THEN** the role creates a new token, updates the Secret, rolls the pods
+  through the token id in the pod annotations, waits for ready agentk pods,
+  and revokes the agent's other active tokens
 
 ### Requirement: Namespace-scoped permissions
 
@@ -50,14 +51,21 @@ target namespace.
 - **WHEN** a target namespace has neither `rules` nor `cluster_role`
 - **THEN** the role fails before changing the cluster
 
-### Requirement: Pinned versions
+### Requirement: Versions
 
-The role SHALL install a pinned chart version and a pinned agentk image tag.
+The role SHALL install the latest chart and an agentk image tag matching the
+GitLab server version, unless the inventory pins either one.
 
-#### Scenario: Install
+#### Scenario: Default install
 
-- **WHEN** the chart is installed
-- **THEN** the release uses the configured chart version and image tag
+- **WHEN** no chart version and no image tag are set
+- **THEN** Helm installs the latest chart and agentk uses `v<major.minor.patch>`
+  of the GitLab server
+
+#### Scenario: Pinned
+
+- **WHEN** a chart version or an image tag is set
+- **THEN** the release uses that value
 
 ### Requirement: Deployment health
 

@@ -1,4 +1,6 @@
 ---
+# Derived values (replica count, image tag, per-agent names) are
+# lazy expressions in vars/main.yml.
 - name: K3s server block for {{ app_name }}
   become: true
   run_once: true
@@ -9,6 +11,17 @@
         repo_url: "https://charts.gitlab.io"
         binary_path: "{{ k3s_gitlab_agent_helm_binary_path }}"
 
+    # agentk should match the GitLab server version; an explicit tag wins.
+    - name: Read GitLab server version
+      ansible.builtin.uri:
+        url: "{{ k3s_gitlab_agent_api_url }}/version"
+        headers:
+          PRIVATE-TOKEN: "{{ k3s_gitlab_agent_api_token }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_agent_server_version
+      when: k3s_gitlab_agent_image_tag | length == 0
+      no_log: true
+
     - name: Read schedulable Kubernetes nodes
       kubernetes.core.k8s_info:
         api_version: v1
@@ -17,51 +30,14 @@
         validate_certs: "{{ http.ssl_verify }}"
       register: k3s_gitlab_agent_nodes
 
-    - name: Count schedulable Kubernetes nodes
-      ansible.builtin.set_fact:
-        k3s_gitlab_agent_schedulable_node_count: >-
-          {{
-            k3s_gitlab_agent_nodes.resources | default([])
-            | map(attribute='spec.unschedulable', default=false)
-            | reject('equalto', true)
-            | list | length
-          }}
-
-    - name: Calculate agentk replica count
-      ansible.builtin.set_fact:
-        k3s_gitlab_agent_replicas_effective: >-
-          {{
-            k3s_gitlab_agent_replicas | int
-            if k3s_gitlab_agent_replicas is not none
-            else (
-              [
-                [1, k3s_gitlab_agent_schedulable_node_count | int] | max,
-                k3s_gitlab_agent_replicas_max | int
-              ] | min
-              if k3s_gitlab_agent_replicas_auto | bool
-              else 1
-            )
-          }}
-
-    - name: Initialize agent summary
-      ansible.builtin.set_fact:
-        k3s_gitlab_agent_summary_records: []
-
     - name: Register and deploy agents
       ansible.builtin.include_tasks: agent.yml
       loop: "{{ k3s_gitlab_agent_config_list }}"
       loop_control:
         loop_var: agent_item
+        index_var: agent_index
         label: "{{ agent_item.name }}"
 
-    - name: Show K3s GitLab agent deployment summary
+    - name: Show K3s GitLab agent cluster summary
       ansible.builtin.debug:
-        msg:
-          cluster:
-            schedulable_nodes: "{{ k3s_gitlab_agent_schedulable_node_count }}"
-            replicas: "{{ k3s_gitlab_agent_replicas_effective }}"
-          chart_version: "{{ k3s_gitlab_agent_chart_version }}"
-          image_tag: "{{ k3s_gitlab_agent_image_tag }}"
-          kas_address: "{{ k3s_gitlab_agent_kas_address }}"
-          rotation: "{{ k3s_gitlab_agent_rotate_token | bool }}"
-          agents: "{{ k3s_gitlab_agent_summary_records }}"
+        msg: "{{ lookup('ansible.builtin.template', 'summary-cluster.yaml.j2') | from_yaml }}"

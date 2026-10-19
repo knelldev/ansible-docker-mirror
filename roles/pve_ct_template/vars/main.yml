@@ -1,8 +1,37 @@
 ---
-# vars file for pve_ct_template
+app_name: "{{ lookup('ansible.builtin.vars', role_name + '_name', default=role_name.split('_')[1:] | join('_')) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ lookup('ansible.builtin.vars', role_name + '_path', default=storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ lookup('ansible.builtin.vars', role_name + '_user', default=app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ lookup('ansible.builtin.vars', role_name + '_group', default=app_user) }}" # noqa var-naming[no-role-prefix]
+app_user_create: "{{ lookup('ansible.builtin.vars', role_name + '_user_create', default=false) }}" # noqa var-naming[no-role-prefix]
+app_dir_extra: "{{ lookup('ansible.builtin.vars', role_name + '_dir_extra', default=[]) }}" # noqa var-naming[no-role-prefix]
+
 pve_ct_template_api_url: "https://{{ pve_ct_template_api_host }}:{{ pve_ct_template_api_port }}/api2/json"
 pve_ct_template_api_headers:
   Authorization: >-
     PVEAPIToken={{ pve_ct_template_api_user }}!{{ pve_ct_template_api_token_id }}={{ pve_ct_template_api_token_secret }}
 pve_ct_template_netif_dmz: "name=eth0,bridge={{ pve_ct_template_dmz_bridge }},{{ pve_ct_template_net_options }}"
 pve_ct_template_netif_int: "name=eth0,bridge={{ pve_ct_template_int_bridge }},{{ pve_ct_template_net_options }}"
+
+###############################################################################
+# Derived values over results registered in the task files, evaluated lazily
+# where they are used. Plain expressions only (no dict/list literals), so the
+# shared __REQUIRED__ check can template them before the results exist.
+###############################################################################
+# Next free VMID (api_nextid.yml)
+pve_ct_template_nextid: "{{ pve_ct_template_nextid_result.json.data | int }}"
+# IPv4 of eth0 without prefix length (api_guest_ip.yml)
+pve_ct_template_guest_ip: >-
+  {{ (pve_ct_template_ifaces.json.data | selectattr('name', 'equalto', 'eth0')
+      | map(attribute='inet') | select | first).split('/') | first }}
+# Newest stock image in the node's appliance index (phase_build.yml)
+pve_ct_template_image: >-
+  {{ pve_ct_template_aplinfo.json.data | map(attribute='template')
+     | select('match', pve_ct_template_image_regex) | sort | last }}
+# Installed packages as sorted name-version-release lines (guest_packages.yml)
+pve_ct_template_package_facts: "{{ ansible_facts.packages.values() | flatten }}"
+pve_ct_template_packages: >-
+  {{ pve_ct_template_package_facts | map(attribute='name')
+     | zip(pve_ct_template_package_facts | map(attribute='version'),
+           pve_ct_template_package_facts | map(attribute='release'))
+     | map('join', '-') | unique | sort }}

@@ -21,3 +21,7 @@ pve_ct_template_build_key_file: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLA
 pve_ct_template_admin_user: localadmin
 pve_ct_template_admin_pubkeys: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_ADMIN_PUBKEYS', default='') | split('\n') | select | list }}"
 pve_ct_template_admin_key_file: "{{ lookup('ansible.builtin.env', 'PVE_CT_TEMPLATE_ADMIN_KEY_FILE', default='') }}"
+
+# Local run fact (shared tasks/main.yml): off, the role works through the
+# Proxmox API from localhost.
+pve_ct_template_fact_enabled: false

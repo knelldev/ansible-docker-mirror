@@ -1,0 +1,14 @@
+---
+- name: Record available root filesystem capacity
+  ansible.builtin.set_fact:
+    k3s_gitlab_runner_root_available_gib: >-
+      {{
+        (
+          ansible_mounts
+          | selectattr('mount', 'equalto', '/')
+          | map(attribute='size_available')
+          | first
+          | default(0)
+          | int
+        ) / 1073741824
+      }}

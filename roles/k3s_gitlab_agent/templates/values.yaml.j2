@@ -1,8 +1,12 @@
 # {{ ansible_managed }}
-# Values for gitlab/gitlab-agent {{ k3s_gitlab_agent_chart_version }}. The
-# token is never here: the chart mounts the Secret named in config.secretName.
+# Values for gitlab/gitlab-agent, release {{ agent_item.name }}.
+# The token is never here: the chart mounts the Secret named in
+# config.secretName. Manual use on this host:
+#   helm upgrade {{ agent_item.name }} gitlab/gitlab-agent -n {{ k3s_gitlab_agent_item_namespace }} -f {{ k3s_gitlab_agent_item_values_path }}
+{% if k3s_gitlab_agent_image_tag_effective | length > 0 %}
 image:
-  tag: {{ k3s_gitlab_agent_image_tag | to_json }}
+  tag: {{ k3s_gitlab_agent_image_tag_effective | to_json }}
+{% endif %}
 
 replicas: {{ k3s_gitlab_agent_replicas_effective | int }}
 
@@ -13,19 +17,30 @@ rbac:
 
 serviceAccount:
   create: true
-  name: {{ k3s_gitlab_agent_service_account | to_json }}
+  name: {{ k3s_gitlab_agent_item_service_account | to_json }}
 
 config:
   kasAddress: {{ k3s_gitlab_agent_kas_address | trim | to_json }}
-  secretName: {{ k3s_gitlab_agent_secret_name | to_json }}
+  secretName: {{ k3s_gitlab_agent_item_secret_name | to_json }}
 {% if k3s_gitlab_agent_kas_ca_cert | length > 0 %}
   kasCaCert: {{ k3s_gitlab_agent_kas_ca_cert | to_json }}
 {% endif %}
+  # Metrics Service and the chart's prometheus.io/* pod annotations; when off,
+  # the chart drops both. Probes keep working either way.
+  observability:
+    enabled: {{ k3s_gitlab_agent_monitoring | bool | to_json }}
   # On by default in the chart; it adds a ClusterRole and ClusterRoleBinding.
   operational_container_scanning:
     enabled: false
   receptive:
     enabled: false
+
+{% if k3s_gitlab_agent_item_token_id | length > 0 %}
+# Helm merges this with the chart's podAnnotations. A new token id (rotation)
+# changes the pod template, so Helm rolls the pods.
+podAnnotations:
+  {{ k3s_gitlab_agent_token_id_annotation }}: {{ k3s_gitlab_agent_item_token_id | to_json }}
+{% endif %}
 
 resources: {{ k3s_gitlab_agent_resources | to_json }}
 
@@ -38,7 +53,7 @@ affinity:
           topologyKey: kubernetes.io/hostname
           labelSelector:
             matchLabels:
-              app.kubernetes.io/instance: {{ k3s_gitlab_agent_name | to_json }}
+              app.kubernetes.io/instance: {{ agent_item.name | to_json }}
 {% else %}
 affinity: {}
 {% endif %}

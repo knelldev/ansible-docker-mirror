@@ -54,7 +54,7 @@ k3s_gitlab_runner_ephemeral_storage_buffer_min_gib: 20
 k3s_gitlab_runner_ephemeral_storage_buffer_pct: 20
 
 # Hook scripts (pre/post build resource monitoring)
-# Set to false to disable hook scripts and hostpath volume mount
+# Set to false to disable hook scripts and their ConfigMap volume mount
 k3s_gitlab_runner_hooks_enabled: true
 k3s_gitlab_runner_hook_sample_interval_seconds: 5
 k3s_gitlab_runner_hook_memory_upgrade_threshold_pct: 80
@@ -113,3 +113,9 @@ k3s_gitlab_runner_force_reinstall: false
 # - If neither is provided: falls back to k3s_gitlab_runner_admin_token for auto-registration.
 # - If NO token is provided: the role fails before it changes the cluster.
 k3s_gitlab_runner_config_list: []
+
+# Directories below app_path (tasks/00-prepare.yml), which itself is always
+# created. Each item: name (relative to app_path), optional owner and
+# group (default root and storage_group, or app_user and app_group with
+# k3s_gitlab_runner_user_create), mode (default 0700) and recurse.
+k3s_gitlab_runner_dir_extra: []

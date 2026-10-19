@@ -44,7 +44,7 @@ only to the OPNsense LAPI over the tunnel (E-D4; local LAPI disabled).
 
 ### Lockout safety
 
-The role refuses an empty `os_edge_ssh_allow`, also allows SSH over the
+The role refuses an empty `os_prepare_firewall_ssh_allow`, also allows SSH over the
 tunnel, checks rules with `nft -c`, and applies them with a timed revert
 unless confirmed. ICMPv6 for neighbour discovery and packet-too-big stays
 open, or IPv6 and PMTU break.
@@ -56,3 +56,16 @@ open, or IPv6 and PMTU break.
 - How do IPv4-only clients reach apps behind an IPv6-only VPS (forwarding
   follow-up, dual-stack front, keep `legacy`)?
 - Tunnel addressing: IPv4 only inside the tunnel, or also a ULA IPv6?
+
+## Decisions 2026-10-19 (owner)
+
+- Role renamed `os_edge` → `os_wg`, variables `os_edge_*` → `os_wg_*`
+  (`playbooks/os_wg.yml`). Scope: bare WireGuard (key, interface, peer, MTU)
+  plus an optional edge part (IPv4/IPv6 forwarding etc.) behind
+  `os_wg_edge_enabled`, default false.
+- The nftables allowlist moves to `os_prepare` as an optional part
+  (`os_prepare_firewall_enabled`, default false; variables and a TODO task
+  file only). The lockout rules above apply there.
+- CrowdSec leaves this role; it is planned as a later, separate container
+  role (agent reporting to the OPNsense LAPI). The decision "Host config vs
+  container" above therefore no longer applies to `os_wg`.

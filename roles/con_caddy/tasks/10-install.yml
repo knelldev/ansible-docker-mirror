@@ -6,16 +6,16 @@
       ansible.builtin.copy:
         src: error.html
         dest: "{{ app_path }}/errors/error.html"
-        owner: root
-        group: root
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
         mode: "0644"
 
     - name: Template Cloudflare token env file for {{ app_name }}
       ansible.builtin.template:
         src: caddy.env.j2
         dest: "{{ app_path }}/caddy.env"
-        owner: root
-        group: root
+        owner: "{{ app_user if app_user_create | bool else 'root' }}"
+        group: "{{ app_group if app_user_create | bool else 'root' }}"
         mode: "0600"
       no_log: true
       notify: Restart caddy
