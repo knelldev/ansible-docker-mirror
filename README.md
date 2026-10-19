@@ -75,6 +75,7 @@ inventory handling, and Semaphore configuration, see
 - `con_gitlab.yml`, `con_minio.yml`, `con_nginx.yml`, and `con_semaphore.yml`
   for Podman container deployments
 - `k3s_gitlab_runner.yml` for GitLab Runner on K3s
+- `k3s_gitlab_agent.yml` for the GitLab agent for Kubernetes on K3s
 - `win_container.yml`, `win_gitlab_runner.yml`, and
   `win_gitlab_runner_only.yml` for Windows targets
 - `pve_vm_clone.yml` for Proxmox VM cloning

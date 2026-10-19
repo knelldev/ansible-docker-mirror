@@ -1,6 +1,6 @@
 # Project Tech Stack & Blueprint Matrix
 
-> Binding reference for the `ansible-docker` workspace. All new roles, playbooks, collections, and CI artifacts MUST conform to the contracts below. **Version:** `v1.1.0` · **Verified:** 2026-08-13.
+> Binding reference for the `ansible-docker` workspace. All new roles, playbooks, collections, and CI artifacts MUST conform to the contracts below. **Version:** `v1.1.1` · **Verified:** 2026-08-13.
 >
 > See also: [AGENTS.md](./AGENTS.md) (root DOX rail) · [.github/prompts/techstack.prompt.md](./.github/prompts/techstack.prompt.md) (maintenance prompt) · [.github/prompts/techstack.template.md](./.github/prompts/techstack.template.md) (template source)
 
@@ -35,7 +35,7 @@
 - **Distribution status**: Galaxy metadata exists, but contains template values; collection packaging is deferred in `defer-galaxy-skeleton-packaging`.
 - **Execution targets** (multi-target by design):
   - Bare-metal / VPS Linux (Rocky / Alma / Debian family) — `roles/os_prepare`, `roles/os_vps`, `roles/os_mount`.
-  - K3s clusters — `roles/os_k3s`, `roles/k3s_gitlab_runner`.
+  - K3s clusters — `roles/os_k3s`, `roles/k3s_gitlab_runner`, `roles/k3s_gitlab_agent`.
   - Windows hosts — `roles/win_prepare`, `roles/win_container`, `roles/win_gitlab_runner`.
   - Proxmox VE — `roles/pve_vm_clone` (collection currently disabled).
   - GitLab self-hosted — `roles/con_gitlab`.
@@ -215,6 +215,12 @@ Each `roles/<role>/README.md` MUST cover, in order:
 ## Changelog
 
 All notable changes to this file are documented here. Format follows [keep-a-changelog](https://keepachangelog.com/).
+
+### v1.1.1 — 2026-10-18
+
+**Changed**
+
+- Listed `roles/k3s_gitlab_agent` under K3s execution targets.
 
 ### v1.1.0 — 2026-08-13
 

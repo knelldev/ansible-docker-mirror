@@ -1,0 +1,125 @@
+---
+# Wait until the agentk deployment of k3s_gitlab_agent_name has rolled out
+# with all replicas ready. On failure show pod state, events and logs (agentk
+# reads its token from a file and does not log it), then fail.
+- name: Check agentk rollout for {{ k3s_gitlab_agent_name }}
+  block:
+    - name: Wait for ready agentk pods of {{ k3s_gitlab_agent_name }}
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ k3s_gitlab_agent_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/instance={{ k3s_gitlab_agent_name }}"
+        kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_agent_rollout
+      until: >-
+        k3s_gitlab_agent_rollout.resources | length > 0
+        and (
+          k3s_gitlab_agent_rollout.resources
+          | rejectattr('status.observedGeneration', 'defined')
+          | list | length
+        ) == 0
+        and (
+          k3s_gitlab_agent_rollout.resources
+          | selectattr('status.readyReplicas', 'defined')
+          | selectattr('status.updatedReplicas', 'defined')
+          | selectattr('status.readyReplicas', 'ge', k3s_gitlab_agent_replicas_effective | int)
+          | selectattr('status.updatedReplicas', 'ge', k3s_gitlab_agent_replicas_effective | int)
+          | selectattr('status.replicas', 'equalto', k3s_gitlab_agent_replicas_effective | int)
+          | list | length
+        ) == (k3s_gitlab_agent_rollout.resources | length)
+        and (
+          k3s_gitlab_agent_rollout.resources
+          | map(attribute='status.observedGeneration')
+          | list
+        ) == (
+          k3s_gitlab_agent_rollout.resources
+          | map(attribute='metadata.generation')
+          | list
+        )
+      retries: "{{ k3s_gitlab_agent_health_check_retries }}"
+      delay: "{{ k3s_gitlab_agent_health_check_delay }}"
+      changed_when: false
+
+  rescue:
+    - name: Read agentk pods of {{ k3s_gitlab_agent_name }}
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ k3s_gitlab_agent_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/instance={{ k3s_gitlab_agent_name }}"
+        kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_agent_failed_pods
+      failed_when: false
+
+    - name: Read agentk pod logs of {{ k3s_gitlab_agent_name }}
+      kubernetes.core.k8s_log:
+        name: "{{ item.metadata.name }}"
+        namespace: "{{ k3s_gitlab_agent_namespace }}"
+        tail_lines: "{{ k3s_gitlab_agent_failure_log_lines }}"
+        kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      loop: "{{ k3s_gitlab_agent_failed_pods.resources | default([]) }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+      register: k3s_gitlab_agent_failed_logs
+      failed_when: false
+
+    - name: Read agent namespace events of {{ k3s_gitlab_agent_name }}
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Event
+        namespace: "{{ k3s_gitlab_agent_namespace }}"
+        kubeconfig: "{{ k3s_gitlab_agent_kubeconfig_path }}"
+        validate_certs: "{{ http.ssl_verify }}"
+      register: k3s_gitlab_agent_failed_events
+      failed_when: false
+
+    - name: Show agentk failure diagnostics of {{ k3s_gitlab_agent_name }}
+      ansible.builtin.debug:
+        msg:
+          pods: >-
+            {{
+              k3s_gitlab_agent_failed_pods.resources | default([])
+              | map(attribute='metadata.name')
+              | zip(
+                k3s_gitlab_agent_failed_pods.resources | default([])
+                | map(attribute='status.phase', default='unknown'),
+                k3s_gitlab_agent_failed_pods.resources | default([])
+                | map(attribute='status.containerStatuses', default=[])
+              )
+              | list
+            }}
+          events: >-
+            {{
+              k3s_gitlab_agent_failed_events.resources | default([])
+              | map(attribute='involvedObject.name', default='')
+              | zip(
+                k3s_gitlab_agent_failed_events.resources | default([])
+                | map(attribute='reason', default=''),
+                k3s_gitlab_agent_failed_events.resources | default([])
+                | map(attribute='message', default='')
+              )
+              | list
+            }}
+          logs: >-
+            {{
+              k3s_gitlab_agent_failed_logs.results | default([])
+              | map(attribute='item.metadata.name')
+              | zip(
+                k3s_gitlab_agent_failed_logs.results | default([])
+                | map(attribute='log_lines', default=[])
+              )
+              | list
+            }}
+
+    - name: Fail on unready agentk for {{ k3s_gitlab_agent_name }}
+      ansible.builtin.fail:
+        msg: >-
+          agentk {{ k3s_gitlab_agent_name }} in {{ k3s_gitlab_agent_namespace }}
+          did not become ready with {{ k3s_gitlab_agent_replicas_effective }}
+          replicas. See the diagnostics above.

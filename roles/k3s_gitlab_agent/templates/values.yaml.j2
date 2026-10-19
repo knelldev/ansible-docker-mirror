@@ -1,0 +1,44 @@
+# {{ ansible_managed }}
+# Values for gitlab/gitlab-agent {{ k3s_gitlab_agent_chart_version }}. The
+# token is never here: the chart mounts the Secret named in config.secretName.
+image:
+  tag: {{ k3s_gitlab_agent_image_tag | to_json }}
+
+replicas: {{ k3s_gitlab_agent_replicas_effective | int }}
+
+# The chart's own RBAC is a cluster-wide ClusterRoleBinding (cluster-admin by
+# default). The role grants namespaced Roles per target instead.
+rbac:
+  create: false
+
+serviceAccount:
+  create: true
+  name: {{ k3s_gitlab_agent_service_account | to_json }}
+
+config:
+  kasAddress: {{ k3s_gitlab_agent_kas_address | trim | to_json }}
+  secretName: {{ k3s_gitlab_agent_secret_name | to_json }}
+{% if k3s_gitlab_agent_kas_ca_cert | length > 0 %}
+  kasCaCert: {{ k3s_gitlab_agent_kas_ca_cert | to_json }}
+{% endif %}
+  # On by default in the chart; it adds a ClusterRole and ClusterRoleBinding.
+  operational_container_scanning:
+    enabled: false
+  receptive:
+    enabled: false
+
+resources: {{ k3s_gitlab_agent_resources | to_json }}
+
+{% if k3s_gitlab_agent_replicas_effective | int > 1 %}
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ k3s_gitlab_agent_name | to_json }}
+{% else %}
+affinity: {}
+{% endif %}
