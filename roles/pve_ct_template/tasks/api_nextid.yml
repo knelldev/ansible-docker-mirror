@@ -1,0 +1,14 @@
+---
+# Helper: free VMID from the cluster -> pve_ct_template_nextid (int)
+- name: Get next free VMID
+  ansible.builtin.uri:
+    url: "{{ pve_ct_template_api_url }}/cluster/nextid"
+    headers: "{{ pve_ct_template_api_headers }}"
+    validate_certs: "{{ pve_ct_template_validate_certs }}"
+    method: GET
+  register: pve_ct_template_nextid_result
+  no_log: true # request headers carry the token secret
+
+- name: Store next free VMID
+  ansible.builtin.set_fact:
+    pve_ct_template_nextid: "{{ pve_ct_template_nextid_result.json.data | int }}"

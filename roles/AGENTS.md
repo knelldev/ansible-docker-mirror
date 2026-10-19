@@ -105,7 +105,9 @@ Individual role [`AGENTS.md`](AGENTS.md) files exist for all roles:
 - **os_k3s/** - K3s Kubernetes cluster
 - **os_mount/** - NFS server/client
 - **os_prepare/** - OS preparation
+- **os_template_reset/** - Reset a guest before templating
 - **os_vps/** - VPS optimizations
+- **pve_ct_template/** - Proxmox LXC template build
 - **pve_vm_clone/** - Proxmox VM cloning
 - **win_container/** - Windows container setup
 - **win_gitlab_runner/** - GitLab Runner on Windows

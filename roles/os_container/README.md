@@ -1,38 +1,46 @@
-Role Name
-=========
+# os_container
 
-A brief description of the role goes here.
+Installs Podman on EL hosts, moves rootful storage to
+`os_container_data_root`, configures the Podman auto-update timer, and sets
+optional rootless defaults.
 
-Requirements
-------------
+## Requirements
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- Ansible core 2.17 or newer, no extra collections.
+- EL 9 or EL 10 with EPEL reachable. SELinux tasks run only where SELinux
+  is enabled.
 
-Role Variables
---------------
+## Role variables
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+| Variable                               | Default                                      | Meaning                                                                                                                             |
+| -------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `os_container_data_root`               | `{{ storage_base_path }}/containers/storage` | rootful graphroot                                                                                                                   |
+| `os_container_auto_update`             | `true`                                       | configure `podman-auto-update.timer`                                                                                                |
+| `os_container_auto_update_schedule`    | `Wed *-*-* 02:00:00`                         | timer `OnCalendar`                                                                                                                  |
+| `os_container_subid_min` / `_max`      | unset                                        | subordinate ID range for new users in `/etc/login.defs` (`COUNT` = max - min + 1)                                                   |
+| `os_container_default_netns`           | unset                                        | default network for all Podman users, drop-in in `/etc/containers/containers.conf.d/` (e.g. `host` where `/dev/net/tun` is missing) |
+| `os_container_unprivileged_port_start` | unset                                        | `net.ipv4.ip_unprivileged_port_start`, set at boot by a oneshot unit                                                                |
 
-Dependencies
-------------
+## Dependencies
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+None.
 
-Example Playbook
-----------------
+## Example playbook
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+```yaml
+- hosts: containers
+  roles:
+    - role: os_container
+      vars:
+        os_container_subid_min: 10000
+        os_container_subid_max: 65533
+        os_container_default_netns: host
+```
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+## License
 
-License
--------
+MIT. See the collection repository license.
 
-BSD
+## Author
 
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+knelldev

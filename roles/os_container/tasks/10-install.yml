@@ -28,10 +28,16 @@
         enabled: true
         name: podman
 
-    - name: Apply SELinux context recursively to Podman storage 1/2 # noqa no-changed-value
+    - name: Apply SELinux context recursively to Podman storage 1/2
       ansible.builtin.command: semanage fcontext -a -e /var/lib/containers/storage {{ os_container_data_root }}
-      when: graphroot_lineinfile.changed
+      when:
+        - graphroot_lineinfile.changed
+        - ansible_facts.selinux.status | default('disabled') == 'enabled'
+      changed_when: true # runs only after the graphroot line changed
 
-    - name: Apply SELinux context recursively to Podman storage 2/2 # noqa no-changed-value
+    - name: Apply SELinux context recursively to Podman storage 2/2
       ansible.builtin.command: restorecon -R -v {{ os_container_data_root }}
-      when: graphroot_lineinfile.changed
+      when:
+        - graphroot_lineinfile.changed
+        - ansible_facts.selinux.status | default('disabled') == 'enabled'
+      changed_when: true # runs only after the graphroot line changed

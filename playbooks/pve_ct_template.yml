@@ -1,0 +1,126 @@
+---
+# Build, test and replace the Proxmox LXC templates ct-alma-10-dmz and
+# ct-alma-10-int (change add-ct-template). Runs from Semaphore; secrets come
+# from environment variables (roles/pve_ct_template/README.md).
+# Each play catches its own failure, so the last play can always clean up.
+
+- name: "Playbook: pve_ct_template - build CT"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Build phase
+      ansible.builtin.include_role:
+        name: pve_ct_template
+        tasks_from: phase_build.yml
+
+- name: "Playbook: pve_ct_template - baseline in the build CT"
+  hosts: pve_ct_template_build
+  gather_facts: false
+  vars:
+    # CT values for the baseline roles (design.md, Baseline order)
+    os_prepare_packages:
+      - epel-release
+      - dnf-automatic
+      - git
+      - nano
+      - htop
+      - ncdu
+      - rpmconf
+    os_prepare_dnf_automatic_upgrade_type: security
+    os_prepare_dnf_automatic_apply_updates: true
+    os_prepare_admin_enabled: true
+    os_prepare_admin_user: "{{ pve_ct_template_admin_user }}"
+    os_prepare_admin_pubkeys: "{{ pve_ct_template_admin_pubkeys }}"
+    os_prepare_firstboot_enabled: true
+    os_prepare_node_exporter_enabled: true
+    os_prepare_weekly_update_enabled: true
+    os_prepare_weekly_update_oncalendar: Thu *-*-* 04:00:00
+    os_prepare_weekly_update_reboot: when-needed
+    os_container_auto_update_schedule: Thu *-*-* 04:30:00
+    os_container_subid_min: 10000
+    os_container_subid_max: 65533
+    os_container_default_netns: host
+    os_container_unprivileged_port_start: 80
+    os_template_reset_confirm: true
+  tasks:
+    - name: Baseline, record and reset
+      block:
+        - name: Gather facts
+          ansible.builtin.setup:
+
+        - name: Record stock packages
+          ansible.builtin.include_role:
+            name: pve_ct_template
+            tasks_from: guest_stock.yml
+            public: true
+
+        - name: Run os_prepare
+          ansible.builtin.include_role:
+            name: os_prepare
+
+        - name: Run os_container
+          ansible.builtin.include_role:
+            name: os_container
+
+        - name: Record build values
+          ansible.builtin.include_role:
+            name: pve_ct_template
+            tasks_from: guest_record.yml
+
+        - name: Run os_template_reset
+          ansible.builtin.include_role:
+            name: os_template_reset
+
+        - name: Mark baseline done
+          ansible.builtin.set_fact:
+            pve_ct_template_baseline_ok: true
+      rescue:
+        - name: Record baseline failure
+          ansible.builtin.set_fact:
+            pve_ct_template_baseline_ok: false
+            pve_ct_template_baseline_msg: "{{ ansible_failed_task.name | default('?') }}: {{ ansible_failed_result.msg | default('see log') }}"
+
+- name: "Playbook: pve_ct_template - templates and test clone"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Template phase
+      when: not (pve_ct_template_failed | default(true) | bool)
+      ansible.builtin.include_role:
+        name: pve_ct_template
+        tasks_from: phase_template.yml
+
+- name: "Playbook: pve_ct_template - clone test"
+  hosts: pve_ct_template_test
+  gather_facts: false
+  tasks:
+    - name: Clone test
+      block:
+        - name: Gather facts
+          ansible.builtin.setup:
+
+        - name: Run clone checks
+          ansible.builtin.include_role:
+            name: pve_ct_template
+            tasks_from: guest_test.yml
+
+        - name: Mark test passed
+          ansible.builtin.set_fact:
+            pve_ct_template_test_ok: true
+      rescue:
+        - name: Record test failure
+          ansible.builtin.set_fact:
+            pve_ct_template_test_ok: false
+            pve_ct_template_test_msg: "{{ ansible_failed_task.name | default('?') }}: {{ ansible_failed_result.msg | default('see log') }}"
+
+- name: "Playbook: pve_ct_template - swap or roll back"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Finish phase
+      ansible.builtin.include_role:
+        name: pve_ct_template
+        tasks_from: phase_finish.yml

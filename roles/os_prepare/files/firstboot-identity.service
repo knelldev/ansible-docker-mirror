@@ -1,0 +1,14 @@
+# Managed by Ansible (os_prepare)
+[Unit]
+Description=New machine-id and SSH host keys on the first boot of a clone
+ConditionPathExists=!/var/lib/firstboot-identity.done
+Before=sshd.service sshd-keygen.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/firstboot-identity
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

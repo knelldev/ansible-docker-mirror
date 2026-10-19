@@ -1,0 +1,166 @@
+---
+# Phase 3 (localhost): turn the build CT into the dmz template, full-clone
+# the int template, start a test clone and register it for the test play.
+- name: Template phase
+  module_defaults:
+    group/community.proxmox.proxmox:
+      api_host: "{{ pve_ct_template_api_host }}"
+      api_port: "{{ pve_ct_template_api_port }}"
+      api_user: "{{ pve_ct_template_api_user }}"
+      api_token_id: "{{ pve_ct_template_api_token_id }}"
+      api_token_secret: "{{ pve_ct_template_api_token_secret }}"
+      validate_certs: "{{ pve_ct_template_validate_certs }}"
+  vars:
+    _build: "{{ hostvars[pve_ct_template_build_name] | default({}) }}"
+  block:
+    - name: Check the baseline finished
+      ansible.builtin.assert:
+        that: _build.pve_ct_template_baseline_ok | default(false) | bool
+        fail_msg: "Baseline failed: {{ _build.pve_ct_template_baseline_msg | default('build CT not reached') }}"
+        quiet: true
+
+    # Text first (diff against the previous template, then the stock diff),
+    # truncated to what is left after the package list line; the list is
+    # left out when it would leave less than notes_min_text_chars (CT-Q5).
+    - name: Compose template notes
+      vars:
+        _diff: "{{ _build.pve_ct_template_pkg_diff | default([]) }}"
+        _prev_diff: "{{ _build.pve_ct_template_prev_diff | default([]) }}"
+        _prev_found: "{{ _build.pve_ct_template_prev_found | default(false) | bool }}"
+        # Joined in double-quoted YAML: a '\n' inside a block scalar stays literal
+        _diff_lines: "{{ _diff | join('\n') }}"
+        _prev_lines: "{{ _prev_diff | join('\n') }}"
+        _blob_line: "{{ pve_ct_template_notes_pkglist_marker }}{{ _build.pve_ct_template_pkg_blob_b64 | default('') }}"
+        _store: >-
+          {{ (_build.pve_ct_template_pkg_blob_b64 | default('') | length > 0)
+             and (_blob_line | length + 1 + pve_ct_template_notes_min_text_chars | int
+                  <= pve_ct_template_notes_max_chars | int) }}
+        _budget: "{{ pve_ct_template_notes_max_chars | int - ((_blob_line | length + 1) if _store | bool else 0) }}"
+        _text: |
+          AlmaLinux {{ _build.pve_ct_template_alma_version | default('?') }}
+          Built {{ now(utc=true).strftime('%Y-%m-%d %H:%M') }} UTC from {{ pve_ct_template_image }}
+          ansible-docker commit {{ pve_ct_template_git_commit }}
+          {% if not _store | bool %}
+          Package list not stored: the next build diffs only against the stock image.
+          {% endif %}
+          {% if _prev_found | bool %}
+          Packages new or changed against the previous template {{ pve_ct_template_prev_vmid }} ({{ _prev_diff | length }}):
+          {{ _prev_lines }}
+          {% else %}
+          Previous template: no stored package list, no diff.
+          {% endif %}
+          Packages new or changed against the stock image ({{ _diff | length }}):
+          {{ _diff_lines }}
+        _short: "{{ _text | trim | truncate(_budget | int, true, '\n[truncated; full lists in the task log]', 0) }}"
+      ansible.builtin.set_fact:
+        pve_ct_template_notes: "{{ _short ~ ('\n' ~ _blob_line if _store | bool else '') }}"
+
+    - name: Stop the build CT
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_build_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        state: stopped
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Rename the build CT and set notes
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_build_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        hostname: "{{ pve_ct_template_dmz_name }}"
+        description: "{{ pve_ct_template_notes }}"
+        state: present
+        update: true
+
+    - name: Convert to the dmz template
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_build_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        state: template
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Get VMID for the int template
+      ansible.builtin.include_tasks: api_nextid.yml
+
+    - name: Record int template VMID
+      ansible.builtin.set_fact:
+        pve_ct_template_int_vmid: "{{ pve_ct_template_nextid | int }}"
+        pve_ct_template_created: "{{ pve_ct_template_created + [pve_ct_template_nextid | int] }}"
+        pve_ct_template_allowed_vmids: "{{ pve_ct_template_allowed_vmids + [pve_ct_template_nextid | int] }}"
+
+    - name: Full-clone the dmz template for the int template
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_int_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        clone: "{{ pve_ct_template_build_vmid | int }}"
+        clone_type: full
+        storage: "{{ pve_ct_template_rootfs_storage }}"
+        hostname: "{{ pve_ct_template_int_name }}"
+        pool: "{{ pve_ct_template_pool }}"
+        description: "{{ pve_ct_template_notes }}"
+        state: present
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Move the int clone to the int bridge
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_int_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        hostname: "{{ pve_ct_template_int_name }}"
+        netif:
+          net0: "{{ pve_ct_template_netif_int }}"
+        state: present
+        update: true
+
+    - name: Convert to the int template
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_int_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        state: template
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Get VMID for the test clone
+      ansible.builtin.include_tasks: api_nextid.yml
+
+    - name: Record test clone VMID
+      ansible.builtin.set_fact:
+        pve_ct_template_test_vmid: "{{ pve_ct_template_nextid | int }}"
+        pve_ct_template_created: "{{ pve_ct_template_created + [pve_ct_template_nextid | int] }}"
+        pve_ct_template_allowed_vmids: "{{ pve_ct_template_allowed_vmids + [pve_ct_template_nextid | int] }}"
+
+    - name: Clone the dmz template for the test
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_test_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        clone: "{{ pve_ct_template_build_vmid | int }}"
+        clone_type: full
+        storage: "{{ pve_ct_template_rootfs_storage }}"
+        hostname: "{{ pve_ct_template_test_name }}"
+        pool: "{{ pve_ct_template_pool }}"
+        state: present
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Start the test clone
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_test_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        state: started
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Wait for the test clone
+      ansible.builtin.include_tasks: api_guest_ip.yml
+      vars:
+        pve_ct_template_ip_vmid: "{{ pve_ct_template_test_vmid }}"
+
+    - name: Register the test clone for the test play
+      ansible.builtin.add_host:
+        name: "{{ pve_ct_template_test_name }}"
+        groups: pve_ct_template_test
+        ansible_host: "{{ pve_ct_template_guest_ip }}"
+        ansible_user: "{{ pve_ct_template_admin_user }}"
+        ansible_ssh_private_key_file: "{{ pve_ct_template_admin_key_file }}"
+        ansible_ssh_common_args: -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
+
+  rescue:
+    - name: Record failure of the template phase
+      ansible.builtin.set_fact:
+        pve_ct_template_failed: true
+        pve_ct_template_failed_msg: "template phase: {{ ansible_failed_task.name | default('?') }}: {{ ansible_failed_result.msg | default('see log') }}"

@@ -1,0 +1,73 @@
+---
+- name: Check the reset is confirmed
+  ansible.builtin.assert:
+    that: os_template_reset_confirm | bool
+    fail_msg: >-
+      os_template_reset removes host identity and root keys. Set
+      os_template_reset_confirm=true only for a guest that becomes a template.
+    quiet: true
+
+- name: Reset guest before templating
+  become: true
+  block:
+    # First: copy needs a remote tmp dir, which the next task removes
+    - name: Truncate machine-id
+      when: os_template_reset_truncate_machine_id | bool
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/machine-id
+        owner: root
+        group: root
+        mode: "0444"
+
+    - name: Remove files and directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ os_template_reset_remove_paths }}"
+
+    - name: Find files by pattern
+      ansible.builtin.find:
+        paths: "{{ item.path }}"
+        patterns: "{{ item.patterns }}"
+        recurse: "{{ item.recurse | default(false) }}"
+        hidden: true
+        file_type: file
+      loop: "{{ os_template_reset_remove_patterns }}"
+      loop_control:
+        label: "{{ item.path }}/{{ item.patterns }}"
+      register: os_template_reset_pattern_hits
+
+    - name: Find entries in directories to empty
+      ansible.builtin.find:
+        paths: "{{ os_template_reset_empty_dirs }}"
+        file_type: any
+        hidden: true
+        recurse: false
+      register: os_template_reset_dir_hits
+
+    - name: Find files in directories to clear
+      ansible.builtin.find:
+        paths: "{{ os_template_reset_clear_files_in }}"
+        file_type: file
+        hidden: true
+        recurse: true
+      register: os_template_reset_file_hits
+
+    - name: Remove found entries
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: >-
+        {{
+          (os_template_reset_pattern_hits.results | map(attribute='files') | flatten
+           + os_template_reset_dir_hits.files
+           + os_template_reset_file_hits.files)
+          | map(attribute='path') | unique
+        }}
+
+    - name: Remove root authorized_keys (last step)
+      when: os_template_reset_remove_root_keys | bool
+      ansible.builtin.file:
+        path: /root/.ssh/authorized_keys
+        state: absent

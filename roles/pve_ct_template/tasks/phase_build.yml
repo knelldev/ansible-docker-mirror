@@ -1,0 +1,200 @@
+---
+# Phase 1 (localhost): checks, record state, clean leftovers, download the
+# stock image, create and start the build CT, register it for the next play.
+- name: Initialise run state
+  ansible.builtin.set_fact:
+    pve_ct_template_failed: false
+    pve_ct_template_failed_msg: ""
+    pve_ct_template_created: []
+    pve_ct_template_allowed_vmids: []
+    pve_ct_template_old_vmids: []
+
+- name: Build phase
+  module_defaults:
+    group/community.proxmox.proxmox:
+      api_host: "{{ pve_ct_template_api_host }}"
+      api_port: "{{ pve_ct_template_api_port }}"
+      api_user: "{{ pve_ct_template_api_user }}"
+      api_token_id: "{{ pve_ct_template_api_token_id }}"
+      api_token_secret: "{{ pve_ct_template_api_token_secret }}"
+      validate_certs: "{{ pve_ct_template_validate_certs }}"
+  block:
+    - name: Check inputs
+      ansible.builtin.assert:
+        that:
+          - pve_ct_template_api_host | length > 0
+          - pve_ct_template_api_token_secret | length > 0
+          - pve_ct_template_build_pubkey | length > 0
+          - pve_ct_template_build_key_file | length > 0
+          - pve_ct_template_admin_pubkeys | length > 0
+          - pve_ct_template_admin_key_file | length > 0
+          - pve_ct_template_node in pve_ct_template_allowed_nodes
+          - pve_ct_template_dmz_name is ansible.builtin.match(pve_ct_template_name_prefix | regex_escape)
+          - pve_ct_template_int_name is ansible.builtin.match(pve_ct_template_name_prefix | regex_escape)
+          - pve_ct_template_build_name is ansible.builtin.match(pve_ct_template_name_prefix | regex_escape)
+          - pve_ct_template_test_name is ansible.builtin.match(pve_ct_template_name_prefix | regex_escape)
+        fail_msg: >-
+          Missing secret (PROXMOX_HOST, PROXMOX_TOKEN_SECRET, PVE_CT_TEMPLATE_*),
+          node not allowed, or a guest name without the prefix.
+        quiet: true
+
+    - name: List bridges on the node
+      community.proxmox.proxmox_node_network_info:
+        node: "{{ pve_ct_template_node }}"
+        iface_type: bridge
+      register: pve_ct_template_bridges
+
+    - name: Check both bridges exist on the node
+      ansible.builtin.assert:
+        that:
+          - pve_ct_template_dmz_bridge in (pve_ct_template_bridges.proxmox_node_networks | map(attribute='iface'))
+          - pve_ct_template_int_bridge in (pve_ct_template_bridges.proxmox_node_networks | map(attribute='iface'))
+        fail_msg: "Node {{ pve_ct_template_node }} lacks {{ pve_ct_template_dmz_bridge }} or {{ pve_ct_template_int_bridge }}."
+        quiet: true
+
+    - name: List LXC guests
+      community.proxmox.proxmox_vm_info:
+        type: lxc
+      register: pve_ct_template_guests
+
+    - name: Record current templates and leftovers
+      vars:
+        _guests: "{{ pve_ct_template_guests.proxmox_vms }}"
+        _old: >-
+          {{ _guests | selectattr('name', 'in', [pve_ct_template_dmz_name, pve_ct_template_int_name])
+             | selectattr('template', 'truthy') | list }}
+        _leftover_regex: "^({{ pve_ct_template_leftover_prefixes | map('regex_escape') | join('|') }})"
+        _leftovers: "{{ _guests | selectattr('name', 'match', _leftover_regex) | list }}"
+      ansible.builtin.set_fact:
+        pve_ct_template_old: "{{ _old | items2dict(key_name='vmid', value_name='node') }}"
+        pve_ct_template_old_vmids: "{{ _old | map(attribute='vmid') | map('int') | list }}"
+        pve_ct_template_leftover_vmids: "{{ _leftovers | map(attribute='vmid') | map('int') | list }}"
+        pve_ct_template_allowed_vmids: >-
+          {{ (_old + _leftovers) | map(attribute='vmid') | map('int') | list }}
+
+    # Previous dmz template: its notes may hold its package list (CT-Q5)
+    - name: Pick the previous dmz template
+      vars:
+        _prev: >-
+          {{ pve_ct_template_guests.proxmox_vms | selectattr('name', 'equalto', pve_ct_template_dmz_name)
+             | selectattr('template', 'truthy') | sort(attribute='vmid') | list }}
+      ansible.builtin.set_fact:
+        pve_ct_template_prev_vmid: "{{ (_prev | last | default({}, true)).vmid | default('') }}"
+        pve_ct_template_prev_node: "{{ (_prev | last | default({}, true)).node | default('') }}"
+        pve_ct_template_prev_blob: ""
+
+    - name: Read the previous template's notes
+      when: pve_ct_template_prev_vmid | string | length > 0
+      ansible.builtin.uri:
+        url: "{{ pve_ct_template_api_url }}/nodes/{{ pve_ct_template_prev_node }}/lxc/{{ pve_ct_template_prev_vmid }}/config"
+        headers: "{{ pve_ct_template_api_headers }}"
+        validate_certs: "{{ pve_ct_template_validate_certs }}"
+        method: GET
+      register: pve_ct_template_prev_config
+      failed_when: false
+      no_log: true # request headers carry the token secret
+
+    - name: Keep the previous template's package list
+      when:
+        - pve_ct_template_prev_vmid | string | length > 0
+        - pve_ct_template_prev_config.status | default(0) == 200
+      vars:
+        _descr: "{{ pve_ct_template_prev_config.json.data.description | default('') }}"
+        _regex: "(?m)^{{ pve_ct_template_notes_pkglist_marker | regex_escape }}([A-Za-z0-9+/=]+)\\s*$"
+      ansible.builtin.set_fact:
+        pve_ct_template_prev_blob: "{{ _descr | regex_search(_regex, '\\1') | default([], true) | first | default('') }}"
+
+    - name: Remove leftovers from a failed run
+      ansible.builtin.include_tasks: destroy.yml
+      loop: "{{ pve_ct_template_leftover_vmids }}"
+      loop_control:
+        loop_var: pve_ct_template_destroy_vmid
+
+    - name: Read the appliance index of the node
+      ansible.builtin.uri:
+        url: "{{ pve_ct_template_api_url }}/nodes/{{ pve_ct_template_node }}/aplinfo"
+        headers: "{{ pve_ct_template_api_headers }}"
+        validate_certs: "{{ pve_ct_template_validate_certs }}"
+        method: GET
+      register: pve_ct_template_aplinfo
+      no_log: true # request headers carry the token secret
+
+    - name: Pick the newest stock image
+      ansible.builtin.set_fact:
+        pve_ct_template_image: >-
+          {{ pve_ct_template_aplinfo.json.data | map(attribute='template')
+             | select('match', pve_ct_template_image_regex) | sort | last }}
+
+    # Without url/src the module calls POST /nodes/{node}/aplinfo: the node
+    # downloads from the Proxmox appliance index; skipped if present.
+    - name: Download the stock image on the node
+      community.proxmox.proxmox_template:
+        node: "{{ pve_ct_template_node }}"
+        storage: "{{ pve_ct_template_image_storage }}"
+        content_type: vztmpl
+        template: "{{ pve_ct_template_image }}"
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Get VMID for the build CT
+      ansible.builtin.include_tasks: api_nextid.yml
+
+    # Recorded before the create call so a half-created guest is cleaned up
+    - name: Record build CT VMID
+      ansible.builtin.set_fact:
+        pve_ct_template_build_vmid: "{{ pve_ct_template_nextid | int }}"
+        pve_ct_template_created: "{{ pve_ct_template_created + [pve_ct_template_nextid | int] }}"
+        pve_ct_template_allowed_vmids: "{{ pve_ct_template_allowed_vmids + [pve_ct_template_nextid | int] }}"
+
+    - name: Create the build CT
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_build_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        hostname: "{{ pve_ct_template_build_name }}"
+        ostemplate: "{{ pve_ct_template_image_storage }}:vztmpl/{{ pve_ct_template_image }}"
+        unprivileged: true
+        features: "{{ pve_ct_template_features }}"
+        cores: "{{ pve_ct_template_cores }}"
+        memory: "{{ pve_ct_template_memory }}"
+        swap: "{{ pve_ct_template_swap }}"
+        disk_volume:
+          storage: "{{ pve_ct_template_rootfs_storage }}"
+          size: "{{ pve_ct_template_rootfs_size }}"
+        mount_volumes:
+          - id: mp0
+            storage: "{{ pve_ct_template_data_storage }}"
+            size: "{{ pve_ct_template_data_size }}"
+            mountpoint: "{{ pve_ct_template_data_mountpoint }}"
+        netif:
+          net0: "{{ pve_ct_template_netif_dmz }}"
+        pubkey: "{{ pve_ct_template_build_pubkey }}"
+        pool: "{{ pve_ct_template_pool }}"
+        onboot: false
+        state: present
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Start the build CT
+      community.proxmox.proxmox:
+        vmid: "{{ pve_ct_template_build_vmid | int }}"
+        node: "{{ pve_ct_template_node }}"
+        state: started
+        timeout: "{{ pve_ct_template_timeout }}"
+
+    - name: Wait for the build CT
+      ansible.builtin.include_tasks: api_guest_ip.yml
+      vars:
+        pve_ct_template_ip_vmid: "{{ pve_ct_template_build_vmid }}"
+
+    - name: Register the build CT for the baseline play
+      ansible.builtin.add_host:
+        name: "{{ pve_ct_template_build_name }}"
+        groups: pve_ct_template_build
+        ansible_host: "{{ pve_ct_template_guest_ip }}"
+        ansible_user: root
+        ansible_ssh_private_key_file: "{{ pve_ct_template_build_key_file }}"
+        ansible_ssh_common_args: -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
+
+  rescue:
+    - name: Record failure of the build phase
+      ansible.builtin.set_fact:
+        pve_ct_template_failed: true
+        pve_ct_template_failed_msg: "build phase: {{ ansible_failed_task.name | default('?') }}: {{ ansible_failed_result.msg | default('see log') }}"

@@ -1,0 +1,44 @@
+---
+- name: Local admin user
+  become: true
+  when: os_prepare_admin_enabled | bool
+  block:
+    - name: Check admin public keys are set
+      ansible.builtin.assert:
+        that: os_prepare_admin_pubkeys | length > 0
+        fail_msg: os_prepare_admin_pubkeys is empty; the admin user would have no login.
+        quiet: true
+
+    - name: Create admin user with locked password
+      ansible.builtin.user:
+        name: "{{ os_prepare_admin_user }}"
+        password: "!"
+        password_lock: true
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Create admin .ssh dir
+      ansible.builtin.file:
+        path: "/home/{{ os_prepare_admin_user }}/.ssh"
+        state: directory
+        owner: "{{ os_prepare_admin_user }}"
+        group: "{{ os_prepare_admin_user }}"
+        mode: "0700"
+
+    - name: Set admin authorized_keys
+      ansible.builtin.copy:
+        content: "{{ os_prepare_admin_pubkeys | join('\n') }}\n"
+        dest: "/home/{{ os_prepare_admin_user }}/.ssh/authorized_keys"
+        owner: "{{ os_prepare_admin_user }}"
+        group: "{{ os_prepare_admin_user }}"
+        mode: "0600"
+
+    - name: Allow admin passwordless sudo
+      ansible.builtin.copy:
+        content: "{{ os_prepare_admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        dest: "/etc/sudoers.d/{{ os_prepare_admin_user }}"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s

@@ -1,0 +1,30 @@
+---
+- name: Weekly full update window
+  become: true
+  when: os_prepare_weekly_update_enabled | bool
+  block:
+    - name: Configure weekly dnf-automatic config
+      vars:
+        dnf_automatic_upgrade_type: "{{ os_prepare_weekly_update_upgrade_type }}"
+        dnf_automatic_apply_updates: true
+        dnf_automatic_reboot: "{{ os_prepare_weekly_update_reboot }}"
+      ansible.builtin.template:
+        src: dnf-automatic.conf.j2
+        dest: /etc/dnf/automatic-weekly.conf
+        mode: "0644"
+
+    - name: Install weekly update units
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: "0644"
+      loop:
+        - dnf-automatic-weekly.service
+        - dnf-automatic-weekly.timer
+
+    - name: Enable weekly update timer
+      ansible.builtin.systemd_service:
+        name: dnf-automatic-weekly.timer
+        enabled: true
+        state: started
+        daemon_reload: true
