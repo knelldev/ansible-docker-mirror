@@ -1,0 +1,47 @@
+---
+- name: Configure and start {{ app_name }}
+  become: true
+  block:
+    - name: Copy custom config files for {{ app_name }}
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ app_path }}/conf/conf.d/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ con_caddy_conf_files }}"
+      notify:
+        - Validate caddy config
+        - Reload caddy
+
+    # The validate command runs the pinned image against the rendered temp
+    # file and the conf.d files, so an invalid Caddyfile never replaces the
+    # active one. label=disable keeps the SELinux labels of the live mount.
+    - name: Template and validate Caddyfile for {{ app_name }}
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: "{{ app_path }}/conf/Caddyfile"
+        owner: root
+        group: root
+        mode: "0644"
+        validate: >-
+          podman run --rm --network none --security-opt label=disable
+          --env-file {{ app_path }}/caddy.env
+          -v %s:/tmp/Caddyfile:ro
+          -v {{ app_path }}/conf/conf.d:/etc/caddy/conf.d:ro
+          {{ con_caddy_image }}
+          caddy validate --config /tmp/Caddyfile --adapter caddyfile
+      notify: Reload caddy
+
+    - name: Set service state for {{ app_name }}
+      ansible.builtin.systemd_service:
+        name: caddy
+        state: "{{ con_caddy_systemd_service_state }}"
+        daemon_reload: true
+
+    - name: Wait for port 443 of {{ app_name }}
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 443
+        timeout: "{{ http.retries * http.delay_short }}"
+      when: con_caddy_systemd_service_state == 'started'

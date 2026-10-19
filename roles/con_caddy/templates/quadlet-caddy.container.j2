@@ -1,0 +1,40 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Caddy reverse proxy
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=caddy
+Image={{ con_caddy_image }}
+
+EnvironmentFile={{ app_path }}/caddy.env
+{% if con_caddy_networks | length == 0 %}
+# Host network: binds 80/443 directly, keeps client IPs and reaches upstreams
+# on localhost and the LAN.
+Network=host
+{% else %}
+# Podman networks: upstreams by container name. Podman cannot combine them
+# with host networking, so the ports are published. Rootful port forwarding
+# keeps client source addresses (PROXY protocol allow list still matches).
+{% for network in con_caddy_networks %}
+Network={{ network }}
+{% endfor %}
+PublishPort=80:80/tcp
+PublishPort=443:443/tcp
+PublishPort=443:443/udp
+{% endif %}
+
+Volume={{ app_path }}/conf:/etc/caddy:Z,ro
+Volume={{ app_path }}/errors:/srv/errors:Z,ro
+Volume={{ app_path }}/data:/data:Z
+Volume={{ app_path }}/config:/config:Z
+Volume={{ app_path }}/logs:/var/log/caddy:Z
+
+[Service]
+ExecReload=/usr/bin/podman exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

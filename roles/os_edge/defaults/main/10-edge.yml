@@ -1,0 +1,41 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+# DRAFT variable contract for the entry VPS (OpenSpec change add-edge-vps-role).
+# Tasks are not implemented yet; names may still change.
+#
+# The VPS is IPv6-only: a bare WireGuard server on its public IPv6 that
+# OPNsense dials into. No forwarding of public traffic in this version.
+---
+# SSH from these source CIDRs (IPv4 or IPv6) only. Must not be empty: the role
+# refuses to touch the firewall otherwise. SSH over the tunnel from the
+# OPNsense side is always allowed as a fallback.
+os_edge_ssh_port: 22
+os_edge_ssh_allow: []
+
+# WireGuard server. The private key is generated on the host and never leaves
+# it; the role prints the public key for the OPNsense peer.
+os_edge_wg_interface: wg0
+os_edge_wg_listen_port: 51820
+os_edge_wg_address: __REQUIRED__ # VPS tunnel address, e.g. 10.200.121.2/30
+os_edge_wg_peer_address: __REQUIRED__ # OPNsense tunnel address, e.g. 10.200.121.1
+os_edge_wg_peer_public_key: __REQUIRED__ # OPNsense public key (not secret)
+# Extra AllowedIPs for the OPNsense peer besides its tunnel address.
+os_edge_wg_peer_allowed_ips_extra: []
+# WireGuard over IPv6 with OPNsense behind PPPoE: 1492 - 80 = 1412.
+os_edge_wg_mtu: 1412
+
+# CrowdSec agent (container) reporting to the OPNsense LAPI over WireGuard.
+os_edge_crowdsec_enabled: true
+os_edge_crowdsec_image: docker.io/crowdsecurity/crowdsec:v1.8.1
+os_edge_crowdsec_lapi_url: __REQUIRED__ # e.g. http://10.200.121.1:8080
+os_edge_crowdsec_machine_id: __REQUIRED__
+os_edge_crowdsec_machine_password: __REQUIRED__ # vault
+os_edge_crowdsec_collections:
+  - crowdsecurity/linux
+  - crowdsecurity/sshd
+
+# Optional nftables bouncer on the VPS (host package), pulling decisions from
+# the same LAPI.
+os_edge_crowdsec_bouncer_enabled: false
+os_edge_crowdsec_bouncer_api_key: "" # vault, when the bouncer is enabled

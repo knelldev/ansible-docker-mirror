@@ -1,0 +1,77 @@
+---
+- name: Validate certificate settings for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - con_caddy_acme_challenge in ['dns', 'http']
+      - con_caddy_acme_challenge == 'dns' or con_caddy_cert_wildcards | length == 0
+      - not (con_caddy_dns_used | bool) or con_caddy_cloudflare_api_token | length > 0
+    fail_msg: >-
+      con_caddy_acme_challenge must be dns or http; wildcards need dns; and
+      con_caddy_cloudflare_api_token is required when any site uses dns.
+    quiet: true
+
+- name: Validate forward auth providers for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - item.value.uri | default('') | length > 0
+      - item.value.url | default('') | length > 0 or item.key not in con_caddy_sites | map(attribute='auth', default='') | list
+    fail_msg: >-
+      Forward auth provider {{ item.key }} needs a uri, and a url when a site
+      uses it (for authentik: con_caddy_authentik_outpost_url).
+    quiet: true
+  loop: "{{ con_caddy_forward_auth_all | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Validate site definitions for {{ app_name }}
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.upstream is defined or item.redirect is defined
+      - item.auth | default('') in [''] + con_caddy_forward_auth_all | list
+      - item.upstream_tls | default('') in ['', 'skip_verify']
+      - item.acme_challenge | default('dns') in ['dns', 'http']
+    fail_msg: >-
+      Site {{ item.name | default('(no name)') }} needs a name, an upstream or
+      redirect, a known auth provider, and acme_challenge dns or http.
+    quiet: true
+  loop: "{{ con_caddy_sites }}"
+  loop_control:
+    label: "{{ item.name | default('(no name)') }}"
+
+- name: Check that site names are unique for {{ app_name }}
+  vars:
+    _names: "{{ con_caddy_sites | map(attribute='name') | list + con_caddy_sites | map(attribute='aliases', default=[]) | flatten }}"
+  ansible.builtin.assert:
+    that: _names | length == _names | unique | length
+    fail_msg: Site names and aliases in con_caddy_sites must be unique.
+    quiet: true
+
+- name: Prepare account and storage for {{ app_name }}
+  become: true
+  block:
+    - name: Create user and group for {{ app_name }}
+      when: app_user_create
+      block:
+        - name: Create group for {{ app_name }}
+          ansible.builtin.group:
+            name: "{{ app_group }}"
+            system: true
+            state: present
+
+        - name: Create user for {{ app_name }}
+          ansible.builtin.user:
+            name: "{{ app_user }}"
+            group: "{{ app_group }}"
+            system: true
+            create_home: false
+            state: present
+
+    - name: Create storage directories for {{ app_name }}
+      ansible.builtin.file:
+        path: "{{ app_path }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner | default(app_user if (app_user_create | bool) else 'root') }}"
+        group: "{{ item.group | default(app_group if (app_user_create | bool) else 'root') }}"
+        mode: "{{ item.mode | default('0700') }}"
+      loop: "{{ [{'name': ''}] + (vars[role_name + '_storage_extra_dirs'] | default([])) }}"
