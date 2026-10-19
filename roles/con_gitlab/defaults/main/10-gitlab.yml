@@ -7,7 +7,11 @@ con_gitlab_edition: "gitlab-ee"
 con_gitlab_version: "latest" # <version>-ee.0
 con_gitlab_container_network_create: true
 con_gitlab_container_network_name: gitlab_default
+# SSH port and host shown in clone URLs. Set them to what clients reach, e.g. 22
+# when a firewall forwards 22 to the published port.
 con_gitlab_shell_ssh_port: 2022
+con_gitlab_shell_ssh_publish_port: "{{ con_gitlab_shell_ssh_port }}" # Host port mapped to the container's 22
+con_gitlab_shell_ssh_host: "" # Empty: the external_url host
 con_gitlab_expose: true
 con_gitlab_systemd_service_state: restarted
 
@@ -29,12 +33,18 @@ con_gitlab_default_theme: "2"
 con_gitlab_nginx_enable: true
 con_gitlab_nginx_redirect_http_to_https: false
 con_gitlab_nginx_listen_https: nil
+con_gitlab_nginx_listen_port: nil
+# Behind a reverse proxy: its addresses, so logs and rate limits see client IPs.
+con_gitlab_nginx_real_ip_trusted_addresses: []
+con_gitlab_nginx_real_ip_header: "" # e.g. X-Forwarded-For
+con_gitlab_nginx_real_ip_recursive: "" # e.g. on
 
 ## Gitlab: Registry configuration.
 con_gitlab_registry_enable: false
 con_gitlab_registry_nginx_enabled: true
 con_gitlab_registry_nginx_listen_https: nil
 con_gitlab_registry_nginx_redirect_http_to_https: false
+con_gitlab_registry_nginx_listen_port: nil
 
 ## Gitlab: Pages configuration.
 con_gitlab_pages_enable: false
@@ -42,6 +52,16 @@ con_gitlab_pages_nginx_enabled: true
 con_gitlab_pages_nginx_listen_https: nil
 con_gitlab_pages_nginx_redirect_http_to_https: false
 con_gitlab_pages_namespace_in_path: false
+
+## Gitlab: KAS (agent for Kubernetes) configuration.
+con_gitlab_kas_enable: true
+# Empty: agents connect via the path on the GitLab domain (/-/kubernetes-agent/).
+# Set for a dedicated name, e.g. "wss://kas.{{ con_gitlab_base_domain }}/", and
+# route that name (WebSocket) to con_gitlab_kas_port on the host.
+con_gitlab_kas_external_url: ""
+con_gitlab_kas_port: 8150
+# Publish the agent port. Only needed with a dedicated name; the path mode uses 80/443.
+con_gitlab_kas_expose: "{{ con_gitlab_kas_external_url | length > 0 }}"
 
 # Custom settings block
 # Be careful to not add configs from above.
