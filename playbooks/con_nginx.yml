@@ -1,6 +1,6 @@
 ---
 - name: "Playbook: con_gninx"
-  hosts: "{{ hosts_limit | default('all') }}"
+  hosts: all
   roles:
     # - os_prepare
     # - os_hardening

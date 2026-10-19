@@ -1,3 +1,6 @@
+> **Deprecated.** Use [`con_caddy`](../con_caddy/README.md) for new hosts.
+> `con_nginx` gets no new features and will be removed once its hosts move.
+
 Role Name
 =========
 

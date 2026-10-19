@@ -7,9 +7,7 @@ the `knelldev.rituals` collection.
 
 ## Local Contracts
 
-- `defaults/main/00-general.yml` contains shared defaults only. Preparation
-  defaults, including the derived `app_user_create` switch, stay in
-  `tasks/00-prepare.yml`.
+- `defaults/main/00-general.yml` contains shared defaults only.
 - Defaults files that contain `{{ role_name }}` for Galaxy initialization use
   `.yml.j2`; runtime-only Jinja stays in plain `.yml` files.
 - Numbered files under `tasks/` are static YAML extension slots: `00-prepare`,
@@ -20,20 +18,26 @@ the `knelldev.rituals` collection.
   loop. This same file is currently used by every role, including Windows
   roles; the skeleton itself remains non-Windows because its defaults and
   platform metadata target Linux.
-- `vars/main.yml` is a plain role-internal variable entry point. It provides
-  the derived `app_name`, `app_path`, `app_user`, and `app_group` values used by
-  the default preparation task; preserve or extend them when the role needs
-  more derived values. Optional role-prefixed identity overrides are resolved
-  there, not duplicated in task vars. The derived path may be overridden there
-  when a role needs storage outside the standard `storage_base_path`.
+- `vars/main.yml` starts with the six repository-standard `app_*` lines
+  (`app_name`, `app_path`, `app_user`, `app_group`, `app_user_create`,
+  `app_dir_extra`), each overridable as `<role>_<suffix>`. Every role keeps
+  them unchanged; add other derived values below them.
 - `meta/main.yml.j2` and role-prefixed defaults files are init-time templates;
   generated runtime task YAML remains static.
-- `tasks/00-prepare.yml` creates the configured storage directories and is the
-  place for additional prerequisites and target preparation. It optionally
-  creates a system user and matching system group when enabled by the
-  derived `app_user_create` switch, with storage ownership defaulting to
-  that account or root. Role-specific user and group overrides are optional
-  vars, not defaults; do not duplicate `app_group` in `vars/main.yml`.
+- `tasks/00-prepare.yml` is shared and identical in every role that stores
+  files: optional system user and group (`app_user_create`), then one
+  directory task for `app_path` plus `app_dir_extra`. `app_path` and
+  `<role>_dir_extra` items default to owner `root` (`app_user` with
+  `app_user_create`), group `storage_group` (`app_group` with
+  `app_user_create`), mode `0700`, recurse `false`. To isolate a role from the
+  shared group, add a `name: ""` item with its own group/mode in
+  `<role>_dir_extra`; it runs after the default root entry. Never edit it per
+  role; put role directories in `<role>_dir_extra` (defaults) and other
+  prerequisites in a later file.
+  Delete it when the role stores nothing on the host.
+- `tasks/main.yml` ends with the local run fact
+  (`/etc/ansible/facts.d/<role>.fact`); `templates/fact-info.json.j2`, when
+  present, adds role info such as images or chart versions.
 - `handlers/` is omitted until the role needs handlers.
 - The skeleton does not assume Quadlet, containers, Kubernetes, Proxmox, or a
   specific application.

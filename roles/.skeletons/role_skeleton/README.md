@@ -37,27 +37,28 @@ The generated role includes:
 
 `tasks/main.yml` is the shared role entry point. It validates required
 role-prefixed variables, loads the first matching OS-specific vars file, and
-discovers numbered task files in ascending order. The generated `vars/main.yml`
-provides `app_name`, `app_path`, `app_user`, and `app_group`; `app_name` uses
-the second component of `role_name` and `app_user` converts underscores to
-hyphens. These identity values are derived in `vars/main.yml`, with optional
-role-prefixed overrides. `00-prepare.yml` uses those values to create the configured storage
-directories. It can also create a system group and user when the derived
-`app_user_create` switch is set to `true`. It reads the optional
-`<role_name>_user_create` input, which defaults to `false`. Keep shared
-tunable values in `defaults/main/00-general.yml`, role-prefixed tunable values
-in additional `.yml.j2` defaults files, derived or role-internal values in
-`vars/main.yml`, and role-specific templates under `templates/` when needed.
-Empty optional directories are not generated.
+discovers numbered task files in ascending order. It ends by writing a local fact,
+`/etc/ansible/facts.d/<role>.fact` (role, repo commit, time, Ansible version,
+optional `templates/fact-info.json.j2`, previous run); `<role>_fact_enabled:
+false` skips it. The generated `vars/main.yml` starts with the six standard
+lines: `app_name` (the role name without its prefix, e.g. `gitlab_runner` for
+`k3s_gitlab_runner`), `app_path` (`storage_base_path/app_name`), `app_user`
+(`app_name` with hyphens), `app_group` (`app_user`), `app_user_create`
+(`false`) and `app_dir_extra` (`[]`). Each is overridable as
+`<role>_name`, `<role>_path`, `<role>_user`, `<role>_group`,
+`<role>_user_create` and `<role>_dir_extra`. Keep
+shared tunable values in `defaults/main/00-general.yml`, role-prefixed tunable
+values in additional `.yml.j2` defaults files, derived or role-internal values
+in `vars/main.yml`, and role-specific templates under `templates/` when
+needed. Empty optional directories are not generated.
 
 ## Task slots
 
 The starter provides three conventional slots. They are comments only, so a
 new role does not perform invented work before it is customized:
 
-- `00-prepare.yml`: optionally creates the configured group and user, creates
-  the configured storage directories, and provides a place for more
-  prerequisites.
+- `00-prepare.yml`: shared account and storage task (see below); identical in
+  every role, never edited per role.
 - `10-install.yml`: primary installation or deployment.
 - `20-config.yml`: configuration, integrations, and post-install work.
 
@@ -66,28 +67,17 @@ Add more files with a two-digit prefix, such as `11-config.yml` or
 them automatically; do not manually include the numbered files from another
 task file.
 
-## Preparation defaults
+## Data directories
 
-`tasks/00-prepare.yml` contains lean task-local defaults for account creation
-and storage. The default list contains one item with `name: ""`, which creates
-the main `app_path`. Additional directories can be supplied with
-`<role_name>_storage_extra_dirs`; each item can contain `name`, `owner`,
-`group`, and `mode`. Values omitted from extra items use the task defaults.
-
-`<role_name>_user_create` is an optional role-prefixed preparation input. Leave
-it unset or set it to `false` for normal root-owned storage, or set it to `true`
-when the role needs a system account. The derived `app_user_create` var is used
-by the preparation tasks.
-
-The user and group are created together or not at all. The derived identity
-values are:
-
-- `<role_name>_name` overrides `app_name`.
-- `<role_name>_path` overrides `app_path`.
-- `<role_name>_user` overrides `app_user`.
-- `<role_name>_group` overrides `app_group`.
-
-They are optional vars, not defaults.
+`tasks/00-prepare.yml` creates a system user and group (no home) when
+`app_user_create` is true, then `app_path` and every item of `app_dir_extra`
+in one task. Each item has `name` (relative to `app_path`) and optional
+`owner` and `group` (default `app_user`/`app_group` when `app_user_create`,
+else `root`/`storage_group`), `mode` (default `0700`) and `recurse` (default
+`false`). `app_path` itself always gets these defaults. Set the role's directories in
+`<role>_dir_extra` in defaults. Other prerequisites and checks go into a later
+file such as `05-validate.yml`. A role that stores nothing on the host deletes
+`00-prepare.yml` and keeps the `app_*` lines.
 
 ## Customize
 
@@ -99,18 +89,16 @@ They are optional vars, not defaults.
   Jinja and for files that need no Galaxy substitution.
 - Keep the shared `tasks/main.yml` entry point unless the role has a documented
   reason to diverge.
-- Preserve the generated `app_name`, `app_path`, `app_user`, and `app_group` values in
-  `vars/main.yml`; add other derived values there and put operator-tunable
-  values in `defaults/`.
-- Override `<role_name>_user` or `<role_name>_group` in role vars only when the
-  default `app_user` identity is not suitable.
+- Keep the six generated `app_*` lines in `vars/main.yml` unchanged; add
+  other derived values below them and put operator-tunable values in
+  `defaults/`.
 - Add `meta/main.yml` platform entries and dependencies for the role.
 - Update the generated README with variables, requirements, dependencies,
   examples, and verification steps.
 - Add `handlers/main.yml` and templates only when the role needs them.
 
 The skeleton intentionally has no application-specific defaults or runtime
-implementation. Its generic `app_*` values and base directory task keep it
+implementation. Its generic `app_*` values and data directory task keep it
 useful for OS, container, Kubernetes, Proxmox, and other non-Windows roles
 without making a false assumption about what the role installs.
 

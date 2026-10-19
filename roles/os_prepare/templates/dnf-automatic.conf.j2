@@ -1,3 +1,4 @@
+# {{ ansible_managed }}
 [commands]
 # Set the type of updates to apply. Options are:
 # default - all updates
@@ -6,7 +7,17 @@
 # enhancement - enhancement updates only
 # newpackage - install new packages when updates introduce them
 # distro-sync - apply all updates as a distro-sync
-upgrade_type = default
+upgrade_type = {{ dnf_automatic_upgrade_type }}
+
+# Apply updates automatically
+apply_updates = {{ 'yes' if dnf_automatic_apply_updates | bool else 'no' }}
+
+# Automatically reboot if required after an update
+# Reboot type can be (dnf 4):
+# - 'never': Never reboot automatically
+# - 'when-changed': Reboot after any applied update
+# - 'when-needed': Reboot only if necessary
+reboot = {{ dnf_automatic_reboot }}
 
 [emitters]
 # Disable all notification methods
@@ -26,22 +37,12 @@ debuglevel = 1
 # 'syslog' requires the syslog service to be running
 log = journal
 
-# Apply updates automatically
-apply_updates = yes
-
 [download]
+# dnf 4 reads download_updates only in [commands], so this section has no
+# effect and runs without apply_updates only check and report (as before).
 # Automatically download updates (without applying)
 download_updates = yes
 
 # Save downloaded updates in a cache (for later manual installation)
 # If set to 'yes', updates will not be removed from cache after installation
 save_before_exit = no
-
-[upgrade]
-# Automatically reboot if required after an update
-# Reboot type can be:
-# - 'when-needed': Reboot only if necessary
-# - 'reboot': Always reboot after applying updates
-# - 'reboot-and-wait': Reboot and wait for all processes to restart
-# - 'no-reboot': Never reboot automatically
-reboot = no-reboot

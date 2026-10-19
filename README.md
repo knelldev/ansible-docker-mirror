@@ -24,7 +24,7 @@ not additional general project guides.
 - Linux preparation and Podman-based application roles
 - K3s cluster and GitLab Runner automation
 - Windows preparation and GitLab Runner automation
-- Proxmox VM cloning
+- Proxmox VM cloning and LXC template builds
 - A rootless Ansible controller image
 
 ## Repository Layout
@@ -70,14 +70,22 @@ inventory handling, and Semaphore configuration, see
 
 ## Available Playbooks
 
+Playbooks target `hosts: all` (except `ping_local.yml` and the multi-play
+`pve_ct_template.yml`); pick hosts with `--limit` (`-l`) or the inventory. `k3s_gitlab_runner.yml` and `k3s_gitlab_agent.yml` run against the
+K3s servers (controllers).
+
 - `os_prepare.yml`, `os_container.yml`, and `os_k3s.yml` for Linux preparation,
   container runtime setup, and K3s
-- `con_gitlab.yml`, `con_minio.yml`, `con_nginx.yml`, and `con_semaphore.yml`
-  for Podman container deployments
+- `os_wg.yml` for a WireGuard endpoint, e.g. an IPv6 entry VPS (draft, tasks not implemented)
+- `con_caddy.yml`, `con_gitlab.yml`, `con_minio.yml`, `con_nginx.yml`
+  (deprecated, use `con_caddy.yml`), and `con_semaphore.yml` for Podman
+  container deployments
 - `k3s_gitlab_runner.yml` for GitLab Runner on K3s
+- `k3s_gitlab_agent.yml` for the GitLab agent for Kubernetes on K3s
 - `win_container.yml`, `win_gitlab_runner.yml`, and
   `win_gitlab_runner_only.yml` for Windows targets
 - `pve_vm_clone.yml` for Proxmox VM cloning
+- `pve_ct_template.yml` for the scheduled Proxmox LXC template build
 - `ping.yml` and `ping_local.yml` for connectivity and callback checks
 
 ## Development

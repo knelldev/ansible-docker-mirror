@@ -8,6 +8,7 @@ OS-level preparation and setup for containerized workloads. Establishes Podman, 
 
 - Follows standard `os_*` role layout defined in [`roles/AGENTS.md`](../AGENTS.md)
 - Variables prefixed `os_prepare_*`
+- Optional parts (`40-admin` to `80-firewall`) each sit behind one `os_prepare_*_enabled` switch, default off, so re-runs on existing hosts change nothing.
 - Task files use **descriptive** naming (`10-install.yml`, `20-configure.yml`, `30-customize.yml`) instead of the canonical `00-prepare / 10-install / 20-config`. The two-digit prefix still matches the `main.yml` glob `[0-9][0-9]-*.yml`, so the parent auto-discovery rule still applies — these are auto-discovered, not manually included.
 
 ## Work Guidance

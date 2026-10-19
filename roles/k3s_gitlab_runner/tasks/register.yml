@@ -2,7 +2,7 @@
 # Both custom and T-shirt runners enter through this single managed-state flow.
 - name: Normalize {{ runner_item.key if runner_item.key is defined else runner_item.name }}
   ansible.builtin.set_fact:
-    k3s_gitlab_runner_name: "{{ runner_item.key | default(runner_item.name) }}"
+    k3s_gitlab_runner_item_name: "{{ runner_item.key | default(runner_item.name) }}"
     k3s_gitlab_runner_is_tshirt: "{{ runner_item.key is defined }}"
     k3s_gitlab_runner_resolved_token: ""
     k3s_gitlab_runner_description: >-
@@ -46,11 +46,11 @@
         else omit
       }}
 
-- name: Add managed runner tag for {{ k3s_gitlab_runner_name }}
+- name: Add managed runner tag for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_tags: "{{ (k3s_gitlab_runner_tags + [k3s_gitlab_runner_management_tag]) | unique | list }}"
 
-- name: Calculate ephemeral storage limit for {{ k3s_gitlab_runner_name }}
+- name: Calculate ephemeral storage limit for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_ephemeral_storage_limit: >-
       {{
@@ -63,34 +63,34 @@
     - k3s_gitlab_runner_is_tshirt | bool
     - k3s_gitlab_runner_ephemeral_storage_enabled | bool
 
-- name: Track desired managed runner {{ k3s_gitlab_runner_name }}
+- name: Track desired managed runner {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_desired_descriptions: >-
       {{ k3s_gitlab_runner_desired_descriptions + [k3s_gitlab_runner_description] }}
 
-- name: Check saved values for {{ k3s_gitlab_runner_name }}
+- name: Check saved values for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.slurp:
-    src: "{{ app_path }}/{{ k3s_gitlab_runner_name }}/values.yaml"
+    src: "{{ app_path }}/{{ k3s_gitlab_runner_item_name }}/values.yaml"
   register: k3s_gitlab_runner_saved_values
   changed_when: false
   failed_when: false
   no_log: true
 
-- name: Create managed state directory for {{ k3s_gitlab_runner_name }}
+- name: Create managed state directory for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.file:
-    path: "{{ app_path }}/{{ k3s_gitlab_runner_name }}"
+    path: "{{ app_path }}/{{ k3s_gitlab_runner_item_name }}"
     state: directory
     owner: root
     group: root
     mode: "0700"
 
-- name: Resolve supplied token for {{ k3s_gitlab_runner_name }}
+- name: Resolve supplied token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_resolved_token: "{{ runner_item.token }}"
   when: runner_item.token is defined
   no_log: true
 
-- name: Query existing GitLab runners for {{ k3s_gitlab_runner_name }}
+- name: Query existing GitLab runners for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: >-
       {{
@@ -116,7 +116,7 @@
       )
   no_log: true
 
-- name: Resolve existing GitLab runners for {{ k3s_gitlab_runner_name }}
+- name: Resolve existing GitLab runners for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_existing:
       json: >-
@@ -134,7 +134,7 @@
   when: runner_item.token is not defined
   no_log: true
 
-- name: Rotate token for existing GitLab runner {{ k3s_gitlab_runner_name }}
+- name: Rotate token for existing GitLab runner {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: >-
       {{
@@ -163,13 +163,13 @@
     - (runner_item.api_token is defined) or (k3s_gitlab_runner_admin_token is defined)
   no_log: true
 
-- name: Resolve rotated token for {{ k3s_gitlab_runner_name }}
+- name: Resolve rotated token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_resolved_token: "{{ k3s_gitlab_runner_rotated.json.token }}"
   when: k3s_gitlab_runner_rotated is not skipped
   no_log: true
 
-- name: Reuse saved token for {{ k3s_gitlab_runner_name }}
+- name: Reuse saved token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_resolved_token: >-
       {{
@@ -183,7 +183,7 @@
     - k3s_gitlab_runner_saved_values.content is defined
   no_log: true
 
-- name: Create API-managed runner for {{ k3s_gitlab_runner_name }}
+- name: Create API-managed runner for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/user/runners"
     method: POST
@@ -203,13 +203,13 @@
     - (runner_item.api_token is defined) or (k3s_gitlab_runner_admin_token is defined)
   no_log: true
 
-- name: Resolve created token for {{ k3s_gitlab_runner_name }}
+- name: Resolve created token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_resolved_token: "{{ k3s_gitlab_runner_created.json.token }}"
   when: k3s_gitlab_runner_created is not skipped
   no_log: true
 
-- name: Verify API-managed runner token for {{ k3s_gitlab_runner_name }}
+- name: Verify API-managed runner token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/verify"
     method: POST
@@ -224,7 +224,7 @@
     - k3s_gitlab_runner_resolved_token | default('') | length > 0
   no_log: true
 
-- name: Resolve GitLab runner ID for {{ k3s_gitlab_runner_name }}
+- name: Resolve GitLab runner ID for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_id: >-
       {{ k3s_gitlab_runner_created.json.id
@@ -235,26 +235,26 @@
     - k3s_gitlab_runner_verified is not skipped
   no_log: true
 
-- name: Require a runner token for {{ k3s_gitlab_runner_name }}
+- name: Require a runner token for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.assert:
     that:
       - k3s_gitlab_runner_resolved_token is defined
       - k3s_gitlab_runner_resolved_token | length > 0
     fail_msg: >-
-      {{ k3s_gitlab_runner_name }} needs runner_item.token or an API token to create it.
+      {{ k3s_gitlab_runner_item_name }} needs runner_item.token or an API token to create it.
   no_log: true
 
-- name: Render values for {{ k3s_gitlab_runner_name }}
+- name: Render values for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_rendered_values: "{{ lookup('template', 'values.yaml.j2') }}"
   no_log: true
 
-- name: Validate rendered values for {{ k3s_gitlab_runner_name }}
+- name: Validate rendered values for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_helm_values: "{{ k3s_gitlab_runner_rendered_values | from_yaml }}"
   no_log: true
 
-- name: Detect values change for {{ k3s_gitlab_runner_name }}
+- name: Detect values change for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_values_changed: >-
       {{
@@ -264,19 +264,19 @@
       }}
   no_log: true
 
-- name: Save values for {{ k3s_gitlab_runner_name }}
+- name: Save values for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.copy:
     content: "{{ k3s_gitlab_runner_rendered_values }}"
-    dest: "{{ app_path }}/{{ k3s_gitlab_runner_name }}/values.yaml"
+    dest: "{{ app_path }}/{{ k3s_gitlab_runner_item_name }}/values.yaml"
     owner: root
     group: root
     mode: "0600"
   when: k3s_gitlab_runner_values_changed | bool
   no_log: true
 
-- name: Deploy Helm chart for {{ k3s_gitlab_runner_name }}
+- name: Deploy Helm chart for {{ k3s_gitlab_runner_item_name }}
   kubernetes.core.helm:
-    name: "{{ k3s_gitlab_runner_name }}"
+    name: "{{ k3s_gitlab_runner_item_name }}"
     chart_ref: gitlab/gitlab-runner
     namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
     update_repo_cache: true
@@ -292,13 +292,13 @@
       or (runner_item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) | bool)
   no_log: true
 
-- name: Read runner manager pods {{ k3s_gitlab_runner_name }}
+- name: Read runner manager pods {{ k3s_gitlab_runner_item_name }}
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Pod
     namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
     label_selectors:
-      - "release={{ k3s_gitlab_runner_name }}"
+      - "release={{ k3s_gitlab_runner_item_name }}"
     kubeconfig: "{{ k3s_gitlab_runner_kubeconfig_path }}"
     validate_certs: "{{ http.ssl_verify }}"
   register: k3s_gitlab_runner_manager_pods
@@ -322,7 +322,7 @@
     - k3s_gitlab_runner_values_changed | bool
       or (runner_item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) | bool)
 
-- name: Read failed runner manager pod logs {{ k3s_gitlab_runner_name }}
+- name: Read failed runner manager pod logs {{ k3s_gitlab_runner_item_name }}
   kubernetes.core.k8s_log:
     name: "{{ item.metadata.name }}"
     namespace: "{{ k3s_gitlab_runner_namespace | lower }}"
@@ -336,7 +336,7 @@
     - k3s_gitlab_runner_manager_pods.failed | default(false)
   failed_when: false
 
-- name: Read runner manager pod events {{ k3s_gitlab_runner_name }}
+- name: Read runner manager pod events {{ k3s_gitlab_runner_item_name }}
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Event
@@ -351,7 +351,7 @@
     - k3s_gitlab_runner_manager_pods.failed | default(false)
   failed_when: false
 
-- name: Show runner manager failure diagnostics {{ k3s_gitlab_runner_name }}
+- name: Show runner manager failure diagnostics {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.debug:
     msg:
       pod_status: "{{ k3s_gitlab_runner_manager_pods | default({}) }}"
@@ -361,7 +361,7 @@
     - k3s_gitlab_runner_health_check_enabled | bool
     - k3s_gitlab_runner_manager_pods.failed | default(false)
 
-- name: Require ready runner manager pods {{ k3s_gitlab_runner_name }}
+- name: Require ready runner manager pods {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.assert:
     that:
       - not (k3s_gitlab_runner_manager_pods.failed | default(false))
@@ -376,13 +376,13 @@
           | selectattr('status', 'equalto', 'True')
           | list | length
         ) >= k3s_gitlab_runner_manager_replicas_effective | int
-    fail_msg: "Runner manager {{ k3s_gitlab_runner_name }} did not become ready. See preceding pod diagnostics."
+    fail_msg: "Runner manager {{ k3s_gitlab_runner_item_name }} did not become ready. See preceding pod diagnostics."
   when:
     - k3s_gitlab_runner_health_check_enabled | bool
     - k3s_gitlab_runner_values_changed | bool
       or (runner_item.force_reinstall | default(k3s_gitlab_runner_force_reinstall) | bool)
 
-- name: Verify GitLab runner is connected {{ k3s_gitlab_runner_name }}
+- name: Verify GitLab runner is connected {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ k3s_gitlab_runner_id }}"
     method: GET
@@ -399,7 +399,7 @@
     - (runner_item.api_token is defined) or (k3s_gitlab_runner_admin_token is defined)
   no_log: true
 
-- name: Enforce managed tags on existing GitLab runner {{ k3s_gitlab_runner_name }}
+- name: Enforce managed tags on existing GitLab runner {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.uri:
     url: "{{ k3s_gitlab_runner_gitlab_external_url }}/api/v4/runners/{{ k3s_gitlab_runner_id }}"
     method: PUT
@@ -425,14 +425,14 @@
     - (runner_item.api_token is defined) or (k3s_gitlab_runner_admin_token is defined)
   no_log: true
 
-- name: Record deployment outcome for {{ k3s_gitlab_runner_name }}
+- name: Record deployment outcome for {{ k3s_gitlab_runner_item_name }}
   ansible.builtin.set_fact:
     k3s_gitlab_runner_summary_records: >-
       {{
         k3s_gitlab_runner_summary_records
         + [
           {
-            'name': k3s_gitlab_runner_name,
+            'name': k3s_gitlab_runner_item_name,
             'source': (
               'tshirt' if k3s_gitlab_runner_is_tshirt | bool else 'custom'
             ),

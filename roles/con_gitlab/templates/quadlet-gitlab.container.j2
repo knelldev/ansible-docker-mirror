@@ -1,3 +1,4 @@
+# {{ ansible_managed }}
 [Unit]
 Description=gitlab
 Requires=podman.socket
@@ -20,7 +21,10 @@ PublishPort=80:80
 PublishPort=443:443
 {% endif %}
 
-PublishPort={{ con_gitlab_shell_ssh_port }}:22
+PublishPort={{ con_gitlab_shell_ssh_publish_port }}:22
+{% if con_gitlab_kas_enable and con_gitlab_kas_expose | bool %}
+PublishPort={{ con_gitlab_kas_port }}:8150
+{% endif %}
 
 Network={{ con_gitlab_container_network_name }}.network
 

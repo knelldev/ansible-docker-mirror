@@ -1,2 +1,39 @@
 ---
-# vars file for os_prepare
+app_name: "{{ lookup('ansible.builtin.vars', role_name + '_name', default=role_name.split('_')[1:] | join('_')) }}" # noqa var-naming[no-role-prefix]
+app_path: "{{ lookup('ansible.builtin.vars', role_name + '_path', default=storage_base_path + '/' + app_name) }}" # noqa var-naming[no-role-prefix]
+app_user: "{{ lookup('ansible.builtin.vars', role_name + '_user', default=app_name | replace('_', '-')) }}" # noqa var-naming[no-role-prefix]
+app_group: "{{ lookup('ansible.builtin.vars', role_name + '_group', default=app_user) }}" # noqa var-naming[no-role-prefix]
+app_user_create: "{{ lookup('ansible.builtin.vars', role_name + '_user_create', default=false) }}" # noqa var-naming[no-role-prefix]
+app_dir_extra: "{{ lookup('ansible.builtin.vars', role_name + '_dir_extra', default=[]) }}" # noqa var-naming[no-role-prefix]
+
+# systemd units and drop-ins rendered by templates/systemd-unit.j2: path and
+# sections, each section a list of lines (keys may repeat).
+os_prepare_systemd_units:
+  weekly_update_service:
+    path: /etc/systemd/system/dnf-automatic-weekly.service
+    sections:
+      Unit:
+        - Description=Weekly full update with dnf-automatic
+        - After=network-online.target
+        - Wants=network-online.target
+      Service:
+        - Type=oneshot
+        - Nice=19
+        - IOSchedulingClass=idle
+        - ExecStart=/usr/bin/dnf-automatic /etc/dnf/automatic-weekly.conf
+  weekly_update_timer:
+    path: /etc/systemd/system/dnf-automatic-weekly.timer
+    sections:
+      Unit:
+        - Description=Weekly full update with dnf-automatic
+      Timer:
+        - OnCalendar={{ os_prepare_weekly_update_oncalendar }}
+        - Persistent=true
+      Install:
+        - WantedBy=timers.target
+  node_exporter_override:
+    path: /etc/systemd/system/{{ os_prepare_node_exporter_service }}.service.d/override.conf
+    sections:
+      Service:
+        - ExecStart=
+        - ExecStart={{ os_prepare_node_exporter_binary }} {{ os_prepare_node_exporter_args }}

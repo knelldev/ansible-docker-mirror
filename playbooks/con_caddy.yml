@@ -1,0 +1,7 @@
+---
+- name: "Playbook: con_caddy"
+  hosts: all
+  roles:
+    # - os_prepare
+    # - os_container
+    - con_caddy

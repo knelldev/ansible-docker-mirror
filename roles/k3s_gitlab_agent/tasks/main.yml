@@ -1,0 +1,79 @@
+##############################################################################
+# General main for our roles.
+# Does not need any changes and will use an ascending number order for the tasks.
+# Tasks without a leading number will not be included automatically.
+##############################################################################
+---
+# Pre-flight: catch any __REQUIRED__ sentinel values for this role
+- name: Check for unconfigured mandatory variables
+  vars:
+    _varnames: "{{ q('ansible.builtin.varnames', '^' + role_name + '_') }}"
+    _missing: >-
+      {{
+        _varnames
+        | zip(q('ansible.builtin.vars', *_varnames, default='') | map('default', '') | map('to_json'))
+        | selectattr(1, 'search', '__REQUIRED__')
+        | map(attribute=0) | list
+      }}
+  ansible.builtin.fail:
+    msg: "The following variables must be configured in your host inventory:\n{{ _missing | join('\n') }}"
+  when: _missing | length > 0
+
+# Load additional OS specific configuration from vars folder
+- name: Load vars for os if available
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version | lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
+      skip: true
+
+# Include numbered task files in ascending order (##-name.yml pattern)
+- name: Include tasks
+  ansible.builtin.include_tasks: "{{ item }}"
+  loop: "{{ q('fileglob', role_path + '/tasks/[0-9][0-9]-*.yml') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"
+
+# Record this run on the host (local fact, read back as ansible_local): role,
+# repo commit, time, Ansible version, role info from the optional template
+# templates/fact-info.json.j2, and the values of the run before (rollback
+# info). <role>_fact_enabled: false skips it, e.g. for API-only roles.
+- name: Record run facts for {{ role_name }}
+  when: lookup('ansible.builtin.vars', role_name + '_fact_enabled', default=true) | bool
+  become: true
+  vars:
+    _fact_previous: "{{ ansible_local[role_name] | default({}) }}"
+    _fact:
+      role: "{{ role_name }}"
+      commit: "{{ lookup('ansible.builtin.pipe', 'git -C ' ~ role_path ~ ' rev-parse --short HEAD', errors='ignore') | default('', true) }}"
+      timestamp: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+      ansible_version: "{{ ansible_version.full }}"
+      info: "{{ lookup('ansible.builtin.template', 'fact-info.json.j2') | from_json if (role_path ~ '/templates/fact-info.json.j2') is file else {} }}"
+      previous: "{{ _fact_previous | dict2items | rejectattr('key', 'equalto', 'previous') | items2dict if _fact_previous is mapping else {} }}"
+  block:
+    - name: Create local facts directory
+      ansible.builtin.file:
+        path: /etc/ansible/facts.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # A run record, not configuration: it is rewritten on every run.
+    - name: Write local fact for {{ role_name }}
+      ansible.builtin.copy:
+        content: "{{ _fact | to_nice_json }}\n"
+        dest: /etc/ansible/facts.d/{{ role_name }}.fact
+        owner: root
+        group: root
+        mode: "0644"
+      changed_when: false
+
+    - name: Show run facts for {{ role_name }}
+      ansible.builtin.debug:
+        msg: >-
+          {{ role_name }} at commit {{ _fact.commit or 'unknown' }} with Ansible {{ _fact.ansible_version }};
+          previous run: {{ _fact.previous.commit | default('none') }} at {{ _fact.previous.timestamp | default('-') }}

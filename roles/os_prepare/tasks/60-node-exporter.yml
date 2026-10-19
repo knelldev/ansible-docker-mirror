@@ -1,0 +1,33 @@
+---
+- name: Node exporter
+  become: true
+  when: os_prepare_node_exporter_enabled | bool
+  block:
+    - name: Install node_exporter (EPEL)
+      ansible.builtin.dnf:
+        name: "{{ os_prepare_node_exporter_package }}"
+        state: present
+
+    - name: Create node_exporter drop-in dir
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ os_prepare_node_exporter_service }}.service.d"
+        state: directory
+        mode: "0755"
+
+    - name: Set node_exporter arguments
+      ansible.builtin.template:
+        src: systemd-unit.j2
+        dest: "{{ item.path }}"
+        mode: "0644"
+      loop:
+        - "{{ os_prepare_systemd_units.node_exporter_override }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: os_prepare_node_exporter_override
+
+    - name: Enable and start node_exporter
+      ansible.builtin.systemd_service:
+        name: "{{ os_prepare_node_exporter_service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if os_prepare_node_exporter_override.changed else 'started' }}"
+        daemon_reload: true

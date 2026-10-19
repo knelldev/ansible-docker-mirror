@@ -8,19 +8,18 @@
         path: /etc/systemd/system/podman-auto-update.timer.d/
         state: directory
         mode: "0755"
-      when: os_container_auto_update
 
     - name: Configure podman-auto-update
       ansible.builtin.template:
-        src: "{{ item.src }}"
-        dest: "{{ item.dest }}"
-        mode: '{{ item.mode | default("0644") }}'
+        src: systemd-unit.j2
+        dest: "{{ item.path }}"
+        mode: "0600"
       loop:
-        - src: podman-auto-update.timer.j2
-          dest: /etc/systemd/system/podman-auto-update.timer.d/override.conf
-          mode: "0600"
+        - "{{ os_container_systemd_units.auto_update_timer }}"
+      loop_control:
+        label: "{{ item.path }}"
 
-    - name: Start {{ app_name }}-certbot quadlet
+    - name: Start podman-auto-update timer
       ansible.builtin.systemd_service:
         state: "{{ os_container_auto_systemd_state }}"
         daemon_reload: true

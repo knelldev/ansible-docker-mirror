@@ -14,3 +14,7 @@ win_package_list:
 
 win_pip_list: []
   # - requests
+
+# Local run fact (shared tasks/main.yml): off, facts.d is a Linux path;
+# Windows hosts are not covered.
+win_prepare_fact_enabled: false

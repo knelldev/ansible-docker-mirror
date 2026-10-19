@@ -1,0 +1,45 @@
+###############################################################################
+# Default Values for Role - Might contain placeholders for passwords - NOT live
+###############################################################################
+---
+# Must be set to true by the caller: the role makes the host unusable as a
+# live host (no host keys, no root key, empty machine-id).
+os_template_reset_confirm: false
+
+# Files and directories removed completely
+os_template_reset_remove_paths:
+  - /etc/hostname
+  - /var/lib/firstboot-identity.done
+  - /root/.bash_history
+  - /root/.ansible
+
+# Files matching a pattern below a path (recursive) are removed
+os_template_reset_remove_patterns:
+  - path: /etc/ssh
+    patterns: ssh_host_*
+    recurse: false
+  - path: /home
+    patterns: .bash_history
+    recurse: true
+
+# Every entry inside these directories is removed; the directory stays
+os_template_reset_empty_dirs:
+  - /etc/NetworkManager/system-connections
+  - /var/cache/dnf
+  - /tmp
+  - /var/tmp
+
+# Every file below these directories is removed; directories stay
+# (journald needs /var/log/journal to keep persistent storage)
+os_template_reset_clear_files_in:
+  - /var/log
+
+os_template_reset_truncate_machine_id: true
+
+# Remove /root/.ssh/authorized_keys as the very last step (ends root login
+# with the build key)
+os_template_reset_remove_root_keys: true
+
+# No run fact: the reset removes all local facts (identity of the build run)
+# and must not write a new one afterwards.
+os_template_reset_fact_enabled: false

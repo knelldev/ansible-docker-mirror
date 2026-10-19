@@ -3,7 +3,7 @@
   uri:
     url: "{{ gitlab_url }}/api/v4/runners/reset_registration_token"
     method: POST
-    validate_certs: no
+    validate_certs: "{{ http.ssl_verify }}"
     status_code: 200,201
     body_format: json
     headers:
