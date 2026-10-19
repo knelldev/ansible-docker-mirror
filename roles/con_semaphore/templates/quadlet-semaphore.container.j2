@@ -1,10 +1,11 @@
+# {{ ansible_managed }}
 [Unit]
 Requires=semaphore_postgres.service
 After=semaphore_postgres.service
 
 [Container]
 ContainerName=semaphore
-Image=docker.io/semaphoreui/semaphore:latest
+Image={{ con_semaphore_image }}
 AutoUpdate=registry
 
 EnvironmentFile={{ app_path }}/.env

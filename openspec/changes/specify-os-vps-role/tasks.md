@@ -16,3 +16,8 @@
 
 Choose the supported VPS baseline and identify settings that must remain
 operator-owned.
+
+## Update 2026-10-19
+
+- [x] Decide the VPS baseline: `os_prepare` + `os_wg` (design.md, Decision
+      2026-10-19); `roles/os_vps/` stub removed. Not archived.

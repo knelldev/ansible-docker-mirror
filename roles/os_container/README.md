@@ -1,38 +1,53 @@
-Role Name
-=========
+# os_container
 
-A brief description of the role goes here.
+Installs Podman on EL hosts, moves rootful storage to
+`os_container_data_root`, configures the Podman auto-update timer, and sets
+optional rootless defaults.
 
-Requirements
-------------
+## Requirements
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- Ansible core 2.17 or newer, no extra collections.
+- EL 9 or EL 10 with EPEL reachable. SELinux tasks run only where SELinux
+  is enabled.
 
-Role Variables
---------------
+## Role variables
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+| Variable                               | Default                                      | Meaning                                                                                                                       |
+| -------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `os_container_data_root`               | `{{ storage_base_path }}/containers/storage` | rootful graphroot                                                                                                             |
+| `os_container_auto_update`             | `true`                                       | configure `podman-auto-update.timer`                                                                                          |
+| `os_container_auto_update_schedule`    | `Wed *-*-* 02:00:00`                         | timer `OnCalendar`                                                                                                            |
+| `os_container_rootless`                | `false`                                      | `true`: subordinate ID range for new users in `/etc/login.defs`; `false` removes these lines (OS defaults)                    |
+| `os_container_subid_min` / `_max`      | `100000` / `600100000`                       | that range                                                                                                                    |
+| `os_container_subid_count`             | min(65536, max - min + 1)                    | IDs per new user                                                                                                              |
+| `os_container_netns_host`              | `false`                                      | `true`: network namespace `host` for all Podman users (e.g. where `/dev/net/tun` is missing)                                  |
+| `os_container_unprivileged_port_start` | `null` (off)                                 | `net.ipv4.ip_unprivileged_port_start`, set at boot by a oneshot unit (VM and LXC); unset removes the unit and sets 1024 again |
 
-Dependencies
-------------
+Each switch also reverts its setting when turned off. All Podman settings of
+the role go into one drop-in, `/etc/containers/containers.conf.d/50-os-container.conf`,
+which is absent when it would be empty.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+## Dependencies
 
-Example Playbook
-----------------
+None.
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+## Example playbook
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+```yaml
+- hosts: containers
+  roles:
+    - role: os_container
+      vars:
+        os_container_rootless: true
+        os_container_subid_min: 10000
+        os_container_subid_max: 65533
+        os_container_netns_host: true
+```
 
-License
--------
+## License
 
-BSD
+MIT. See the collection repository license.
 
-Author Information
-------------------
+## Author
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+knelldev

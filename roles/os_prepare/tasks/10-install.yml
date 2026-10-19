@@ -12,6 +12,11 @@
         name: "{{ os_prepare_packages }}"
         state: present
 
+    - name: Create group for data dirs
+      ansible.builtin.group:
+        name: "{{ os_prepare_data_group }}"
+        state: present
+
     - name: Create data dirs
       ansible.builtin.file:
         path: "{{ item.name }}"
@@ -22,4 +27,4 @@
       loop:
         - name: "{{ storage_base_path }}"
           owner: root
-          group: data
+          group: "{{ os_prepare_data_group }}"

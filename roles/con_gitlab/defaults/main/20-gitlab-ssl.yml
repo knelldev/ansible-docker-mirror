@@ -16,3 +16,8 @@ con_gitlab_ssl_certs_dict:
 con_gitlab_letsencrypt_enable: false
 con_gitlab_letsencrypt_contact_emails: ["gitlab@example.com"]
 con_gitlab_letsencrypt_alt_names: []
+con_gitlab_letsencrypt_auto_renew: true
+
+# Certificate paths inside the container. Empty: GitLab's default /etc/gitlab/ssl/<host>.crt
+con_gitlab_nginx_ssl_certificate: ""
+con_gitlab_nginx_ssl_certificate_key: ""

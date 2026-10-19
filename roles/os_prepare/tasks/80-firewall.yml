@@ -1,0 +1,10 @@
+# TODO(os_prepare_firewall_enabled, moved from add-edge-vps-role): nftables
+# allowlist, only when os_prepare_firewall_enabled.
+# - Fail first if os_prepare_firewall_ssh_allow is empty.
+# - Input policy drop; allow established/related, lo, ICMPv6 (neighbour
+#   discovery, packet-too-big, echo, router advertisements), ICMP needed for
+#   PMTU, SSH on os_prepare_firewall_ssh_port from the allowlist. Open: how
+#   other roles add their ports (os_wg listen port). Forward policy drop unless another role
+#   (os_wg edge part) needs forwarding.
+# - Check with `nft -c`, apply with a timed rollback.
+---

@@ -1,0 +1,87 @@
+---
+# Phase 5 (localhost): on success remove the test clone and the old
+# templates (unless a clone from them runs); on failure remove everything
+# this run created. Then fail the run if anything failed.
+- name: Finish phase
+  module_defaults:
+    group/community.proxmox.proxmox:
+      api_host: "{{ pve_ct_template_api_host }}"
+      api_port: "{{ pve_ct_template_api_port }}"
+      api_user: "{{ pve_ct_template_api_user }}"
+      api_token_id: "{{ pve_ct_template_api_token_id }}"
+      api_token_secret: "{{ pve_ct_template_api_token_secret }}"
+      validate_certs: "{{ pve_ct_template_validate_certs }}"
+  vars:
+    _test: "{{ hostvars[pve_ct_template_test_name] | default({}) }}"
+  block:
+    - name: Decide the outcome
+      ansible.builtin.set_fact:
+        pve_ct_template_passed: >-
+          {{ not (pve_ct_template_failed | default(true) | bool)
+             and (_test.pve_ct_template_test_ok | default(false) | bool) }}
+        pve_ct_template_failed_msg: >-
+          {{ pve_ct_template_failed_msg | default('') or _test.pve_ct_template_test_msg | default('test clone not reached') }}
+
+    - name: Remove the test clone
+      when: pve_ct_template_passed | bool
+      ansible.builtin.include_tasks: destroy.yml
+      vars:
+        pve_ct_template_destroy_vmid: "{{ pve_ct_template_test_vmid }}"
+
+    - name: List running tasks on the nodes of the old templates
+      when: pve_ct_template_passed | bool
+      community.proxmox.proxmox_tasks_info:
+        node: "{{ item }}"
+        source: active
+      loop: "{{ pve_ct_template_old.values() | unique }}"
+      register: pve_ct_template_active
+
+    - name: Pick old templates to remove
+      when: pve_ct_template_passed | bool
+      vars:
+        _busy: >-
+          {{ pve_ct_template_active.results | default([]) | map(attribute='proxmox_tasks') | flatten
+             | selectattr('type', 'equalto', 'vzclone') | map(attribute='id') | map('int') | list }}
+      ansible.builtin.set_fact:
+        pve_ct_template_old_remove: "{{ pve_ct_template_old_vmids | difference(_busy) }}"
+        pve_ct_template_old_keep: "{{ pve_ct_template_old_vmids | intersect(_busy) }}"
+
+    - name: Show old templates kept because a clone from them runs
+      when:
+        - pve_ct_template_passed | bool
+        - pve_ct_template_old_keep | length > 0
+      ansible.builtin.debug:
+        msg: "Kept for the next run: {{ pve_ct_template_old_keep }}"
+
+    - name: Remove old templates
+      when: pve_ct_template_passed | bool
+      ansible.builtin.include_tasks: destroy.yml
+      loop: "{{ pve_ct_template_old_remove }}"
+      loop_control:
+        loop_var: pve_ct_template_destroy_vmid
+
+    - name: Remove everything this run created
+      when: not (pve_ct_template_passed | bool)
+      ansible.builtin.include_tasks: destroy.yml
+      loop: "{{ pve_ct_template_created | default([]) | reverse | list }}"
+      loop_control:
+        loop_var: pve_ct_template_destroy_vmid
+
+  rescue:
+    - name: Report a failed cleanup
+      ansible.builtin.fail:
+        msg: >-
+          Cleanup failed at {{ ansible_failed_task.name | default('?') }}:
+          {{ ansible_failed_result.msg | default('see log') }}. Created VMIDs
+          {{ pve_ct_template_created | default([]) }}; check them by hand.
+
+- name: Fail the run if the build or test failed
+  when: not (pve_ct_template_passed | bool)
+  ansible.builtin.fail:
+    msg: "Template build failed, new guests removed, old templates kept. {{ pve_ct_template_failed_msg }}"
+
+- name: Report the new templates
+  ansible.builtin.debug:
+    msg: >-
+      {{ pve_ct_template_dmz_name }}={{ pve_ct_template_build_vmid }},
+      {{ pve_ct_template_int_name }}={{ pve_ct_template_int_vmid }}

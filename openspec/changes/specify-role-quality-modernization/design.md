@@ -8,7 +8,7 @@ violations. Work must be incremental and preserve unrelated user changes.
 
 - Prioritize security/idempotence violations before style-only findings.
 - Decide whether shared variables may remain unprefixed during migration.
-- Define treatment of planning-only roles such as `os_mount` and `os_vps`.
+- Define treatment of planning-only roles such as `os_mount` (`os_vps` was removed on 2026-10-19).
 - Define acceptable collection and platform verification in local CI.
 
 ## Verification Shape

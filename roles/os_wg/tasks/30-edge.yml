@@ -1,0 +1,7 @@
+# TODO(add-edge-vps-role): edge part, only when os_wg_edge_enabled:
+# - net.ipv4.ip_forward / net.ipv6.conf.all.forwarding from
+#   os_wg_edge_ipv4_forward / os_wg_edge_ipv6_forward; revert when off.
+# - Forwarding or DNAT rules for public traffic into the tunnel (follow-up).
+# The host firewall (SSH allowlist) is the optional nftables part of
+# os_prepare (os_prepare_firewall_*).
+---

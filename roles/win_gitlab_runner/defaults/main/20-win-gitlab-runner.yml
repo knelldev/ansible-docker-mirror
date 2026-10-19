@@ -24,3 +24,7 @@ win_gitlab_runner_list:
   - token: token # create on UI
     executor: shell
     description: win-shell
+
+# Local run fact (shared tasks/main.yml): off, facts.d is a Linux path;
+# Windows hosts are not covered.
+win_gitlab_runner_fact_enabled: false

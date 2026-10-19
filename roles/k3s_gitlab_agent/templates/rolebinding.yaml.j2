@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Binds the agentk ServiceAccount of {{ agent_item.name }} in target namespace
+# {{ item.namespace }}, to the agent's Role or to a ClusterRole. The names
+# differ by kind because roleRef is immutable.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+{% if item.rules is defined %}
+  name: {{ k3s_gitlab_agent_target_role_name | to_json }}
+{% else %}
+  name: {{ (k3s_gitlab_agent_target_role_name ~ '-' ~ (item.cluster_role | replace(':', '-'))) | to_json }}
+{% endif %}
+  namespace: {{ item.namespace | to_json }}
+  labels:
+    app.kubernetes.io/managed-by: ansible
+    app.kubernetes.io/instance: {{ agent_item.name | to_json }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+{% if item.rules is defined %}
+  kind: Role
+  name: {{ k3s_gitlab_agent_target_role_name | to_json }}
+{% else %}
+  kind: ClusterRole
+  name: {{ item.cluster_role | to_json }}
+{% endif %}
+subjects:
+  - kind: ServiceAccount
+    name: {{ k3s_gitlab_agent_item_service_account | to_json }}
+    namespace: {{ k3s_gitlab_agent_item_namespace | to_json }}

@@ -1,4 +1,5 @@
 #!/bin/sh
+# {{ ansible_managed }}
 # GitLab Runner Pre-Build Hook
 # Deployed by Ansible - do not edit manually
 # POSIX-compatible (works on alpine, debian, redhat, etc.)
@@ -11,15 +12,16 @@ date +%s > "$MONITOR_DIR/start_time"
 
 # --- Detect runner size from CI variables ---
 RUNNER_SIZE="custom"
-if [ -n "$CI_RUNNER_TAGS" ]; then
-  for tag in $CI_RUNNER_TAGS; do
-    size=$(echo "$tag" | sed -n 's/^k8s-\(xs\|s\|m\|l\|xl\|xxl\)$/\1/p')
-    if [ -n "$size" ]; then
-      RUNNER_SIZE="$size"
+# CI_RUNNER_TAGS may be a JSON array (["k8s-s", "docker-s"]) or a comma list:
+# split on anything that isn't part of a tag name.
+for tag in $(echo "$CI_RUNNER_TAGS" | tr -c 'a-z0-9-' ' '); do
+  case "$tag" in
+    k8s-xs | k8s-s | k8s-m | k8s-l | k8s-xl | k8s-xxl)
+      RUNNER_SIZE="${tag#k8s-}"
       break
-    fi
-  done
-fi
+      ;;
+  esac
+done
 echo "$RUNNER_SIZE" > "$MONITOR_DIR/runner_size"
 
 # --- Read actual memory limit from cgroup ---
